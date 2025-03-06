@@ -3,8 +3,8 @@ name: Deploy Pennyworth Service Bot (Slack)
 on:
   #schedule:
     #- cron: '45 7 * * 1-5'
-  #push:
-    #branches: [ main ]
+  push:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -13,7 +13,7 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Capture start time
         id: start-time
@@ -21,9 +21,9 @@ jobs:
         run: echo "start_time=$(date +%s)" >> $GITHUB_OUTPUT
         
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ vars.PYTHON_VERSION }}
           cache: 'pip'
       
       - name: Install dependencies
@@ -38,12 +38,16 @@ jobs:
           access_token: ${{ secrets.BW_ACCESS_TOKEN }}
           base_url: https://vault.bitwarden.com
           secrets: |
-            c9b70456-681a-4ce3-be4f-b289016dd68c > SLACK_BOT_TOKEN
+            c9b70456-681a-4ce3-be4f-b289016dd68c > SLACK_OAUTH_TOKEN
+            b6282a0a-c5e7-4e5b-95c7-b2970171667c > SLACK_APP_TOKEN
+            32a18ec3-e9c6-4de1-9112-b297017087f0 > SLACK_SIGNING_SECRET
             9e95df6c-4036-418e-98ae-b2890174cfb5 > SLACK_CHANNEL_ID
-            1b3b4b3b-4b3b-4b3b-4b3b-4b3b4b3b4b3b > SLACK_APP_TOKEN
-            2b3b4b3b-4b3b-4b3b-4b3b-4b3b4b3b4b3b > SLACK_SIGNING_SECRET
-            3b3b4b3b-4b3b-4b3b-4b3b-4b3b4b3b4b3b > GEMINI_API_KEY
-            4b3b4b3b-4b3b-4b3b-4b3b-4b3b4b3b4b3b > TRELLO_API_KEY
+            1f995ad3-5630-4a07-8d6b-b2550186c343 > GEMINI_API_KEY
+            1057ab45-80e4-498b-a18c-b297017e15ee > TRELLO_API_KEY
+            0e194f90-5817-4a54-ac8c-b297017e3cef > TRELLO_API_SECRET
+            c75d328d-8699-4fb3-bb5e-b2980000422f > TRELLO_TOKEN
+            e09a916c-4569-4b99-96c3-b2980006da29 > GCP_PROJECT_ID
+            bf5c0050-1ea5-4e3c-bb04-b2980009024a > GCP_SA_KEY
   
       
       - name: Set up application configuration
@@ -51,18 +55,21 @@ jobs:
           # Create config file with secrets
           cat > .env <<EOL
           # Slack Configuration
-          SLACK_BOT_TOKEN=${{ steps.bws.outputs.SLACK_BOT_TOKEN }}
+          SLACK_BOT_TOKEN=${{ steps.bws.outputs.SLACK_OAUTH_TOKEN }}
           SLACK_APP_TOKEN=${{ steps.bws.outputs.SLACK_APP_TOKEN }}
           SLACK_SIGNING_SECRET=${{ steps.bws.outputs.SLACK_SIGNING_SECRET }}
           
           # Google Gemini Configuration
-          GEMINI_API_KEY=${{ steps.bws.outputs.GEMINI_API_KEY }}
+          GOOGLE_GEMINI_API_KEY=${{ steps.bws.outputs.GEMINI_API_KEY }}
           
           # Trello Configuration
           TRELLO_API_KEY=${{ steps.bws.outputs.TRELLO_API_KEY }}
           TRELLO_API_SECRET=${{ steps.bws.outputs.TRELLO_API_SECRET }}
           TRELLO_TOKEN=${{ steps.bws.outputs.TRELLO_TOKEN }}
-          
+
+          # Email Configuration
+          SERVICE_EMAIL=${{ vars.SVC_ACCT_EMAIL }}
+
           # Application Configuration
           LOG_LEVEL=INFO
           ADMIN_CHANNEL=C0123456789
@@ -70,30 +77,62 @@ jobs:
       
       - name: Deploy application
         run: |
-          # Package the application
-          mkdir -p deploy
-          cp -r src/ main.py requirements.txt .env deploy/
-          
-          # Example: Deploy to server (you'll need to adjust this for your deployment target)
-          # For example, using SSH to deploy to a server:
-          # - Install SSH key
-          # - SCP/RSYNC the files
-          # - Restart the service
-          
-          echo "Deployment would happen here"
-          
-          # Example for SSH deployment (uncomment and configure as needed)
-          # mkdir -p ~/.ssh
-          # echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          # chmod 600 ~/.ssh/id_rsa
-          # rsync -avz --delete deploy/ user@server:/path/to/pennyworth-bot/
-          # ssh user@server "cd /path/to/pennyworth-bot && python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt && systemctl restart pennyworth-bot"
-      
-
-          - name: Capture end time
-          id: end-time
-          if: always()
-          run: echo "end_time=$(date +%s)" >> $GITHUB_OUTPUT
+            # Setup Docker Buildx
+            docker buildx create --use
+            
+            # Authenticate to Google Cloud  
+            gcloud auth activate-service-account --key-file <(echo ${{ steps.bws.outputs.GCP_SA_KEY }})
+            
+            # Create Dockerfile if it doesn't exist
+            if [ ! -f Dockerfile ]; then
+                cat > Dockerfile <<EOL
+            FROM python:3.10-slim
+            
+            WORKDIR /app
+            
+            COPY requirements.txt .
+            RUN pip install --no-cache-dir -r requirements.txt
+            
+            COPY . .
+            
+            CMD ["python", "main.py"]
+            EOL
+            fi
+            
+            # Configure Docker for GCR
+            gcloud auth configure-docker
+            
+            # Build and push image to Google Container Registry
+            docker build -t gcr.io/${{ steps.bws.outputs.GCP_PROJECT_ID }}/pennyworth-bot:${{ github.sha }} .
+            docker push gcr.io/${{ steps.bws.outputs.GCP_PROJECT_ID }}/pennyworth-bot:${{ github.sha }}
+            
+            # Deploy to Cloud Run
+            gcloud run deploy pennyworth-bot \
+                --image gcr.io/${{ steps.bws.outputs.GCP_PROJECT_ID }}/pennyworth-bot:${{ github.sha }} \
+                --platform managed \
+                --region us-central1 \
+                --memory 256Mi \
+                --cpu 1 \
+                --min-instances 0 \
+                --max-instances 1 \
+                --no-allow-unauthenticated \
+                --set-env-vars "SLACK_BOT_TOKEN=${{ steps.bws.outputs.SLACK_OAUTH_TOKEN }}" \
+                --set-env-vars "SLACK_APP_TOKEN=${{ steps.bws.outputs.SLACK_APP_TOKEN }}" \
+                --set-env-vars "SLACK_SIGNING_SECRET=${{ steps.bws.outputs.SLACK_SIGNING_SECRET }}" \
+                --set-env-vars "GOOGLE_GEMINI_API_KEY=${{ steps.bws.outputs.GEMINI_API_KEY }}" \
+                --set-env-vars "TRELLO_API_KEY=${{ steps.bws.outputs.TRELLO_API_KEY }}" \
+                --set-env-vars "TRELLO_API_SECRET=${{ steps.bws.outputs.TRELLO_API_SECRET }}" \
+                --set-env-vars "TRELLO_TOKEN=${{ steps.bws.outputs.TRELLO_TOKEN }}" \
+                --set-env-vars "SERVICE_EMAIL=${{ vars.SVC_ACCT_EMAIL }}" \
+                --set-env-vars "LOG_LEVEL=INFO" \
+                --set-env-vars "ADMIN_CHANNEL=${{ steps.bws.outputs.SLACK_CHANNEL_ID }}" \
+                --project ${{ steps.bws.outputs.GCP_PROJECT_ID }} \
+                --quiet
+              
+      - name: Capture end time
+        id: end-time
+        if: always()
+        run: echo "end_time=$(date +%s)" >> $GITHUB_OUTPUT
     
       - name: Calculate runtime
         id: runtime
@@ -115,18 +154,18 @@ jobs:
         if: always()
         uses: slackapi/slack-github-action@v1.25.0
         env:
-            SLACK_BOT_TOKEN: ${{ steps.bws.outputs.SLACK_BOT_TOKEN }}
+            SLACK_OAUTH_TOKEN: ${{ steps.bws.outputs.SLACK_OAUTH_TOKEN }}
         with:
             channel-id: ${{ steps.bws.outputs.SLACK_CHANNEL_ID }}
             payload: |
                 {
-                "text": "Workflow ${{ job.status }}: PostgreSQL Docker Container Deploy & Configure",
+                "text": "Workflow ${{ job.status }}: Pennyworth AI Slack Bot Application",
                 "blocks": [
                     {
                     "type": "header",
                     "text": {
                         "type": "plain_text",
-                        "text": "${{ job.status == 'success' && '✅' || '❌' }} Q-Room Deploy: ${{ job.status }}",
+                        "text": "${{ job.status == 'success' && '✅' || '❌' }} Pennyworth AI Bot: ${{ job.status }}",
                         "emoji": true
                     }
                     },
