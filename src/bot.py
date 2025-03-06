@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Pennyworth Bot - Core Bot Implementation
 """
