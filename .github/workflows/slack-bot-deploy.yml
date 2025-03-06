@@ -116,11 +116,27 @@ jobs:
           # Build and push to GitHub Container Registry
           docker build -t ghcr.io/${{ github.repository_owner }}/pennyworth-bot:${{ github.sha }} .
           docker push ghcr.io/${{ github.repository_owner }}/pennyworth-bot:${{ github.sha }}
-      
+
+      - name: Configure Docker for GCR
+        run: |
+          gcloud auth configure-docker --quiet
+
+      - name: Copy image to Google Container Registry
+        run: |
+          # Pull the GitHub image we just pushed
+          docker pull ghcr.io/${{ github.repository_owner }}/pennyworth-bot:${{ github.sha }}
+
+          # Tag it for Google Container Registry
+          docker tag ghcr.io/${{ github.repository_owner }}/pennyworth-bot:${{ github.sha }} \
+            gcr.io/${{ steps.bws.outputs.GCP_PROJECT_ID }}/pennyworth-bot:${{ github.sha }}
+
+          # Push to Google Container Registry
+          docker push gcr.io/${{ steps.bws.outputs.GCP_PROJECT_ID }}/pennyworth-bot:${{ github.sha }}
+
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy pennyworth-bot \
-            --image ghcr.io/${{ github.repository_owner }}/pennyworth-bot:${{ github.sha }} \
+            --image gcr.io/${{ steps.bws.outputs.GCP_PROJECT_ID }}/pennyworth-bot:${{ github.sha }} \
             --platform managed \
             --region us-central1 \
             --memory 256Mi \
