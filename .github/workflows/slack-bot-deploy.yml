@@ -87,10 +87,10 @@ jobs:
             echo '${{ steps.bws.outputs.GCP_SA_KEY }}' > /tmp/gcp-key.json
             
             # Authenticate with the service account
-            gcloud auth activate-service-account --key-file=/tmp/gcp-key.json
+            gcloud auth activate-service-account --key-file=/tmp/gcp-key.json --project=${{ steps.bws.outputs.GCP_PROJECT_ID }}
             
             # Configure Docker for Container Registry
-            gcloud auth configure-docker --quiet
+            gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
             
             # Clean up the key file
             rm /tmp/gcp-key.json
