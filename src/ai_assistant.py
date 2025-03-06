@@ -5,6 +5,7 @@ Handles AI functionality using Google's Gemini API
 
 import google.generativeai as genai
 from typing import Optional, Dict, Any
+import logging
 
 class AIAssistant:
     def __init__(self, api_key: str):
@@ -70,3 +71,29 @@ class AIAssistant:
             return response.text.strip()
         except Exception:
             return "No description available."
+
+    def summarize_conversation(self, context):
+        """
+        Generate a summary of a conversation.
+        
+        Args:
+            context (dict): Contains channel_name and messages
+        
+        Returns:
+            str: Summary of the conversation
+        """
+        prompt = f"""
+        Please summarize this conversation from the Slack channel #{context['channel_name']}:
+        
+        {context['messages']}
+        
+        Provide a concise but comprehensive summary in a formal butler-like tone, as Pennyworth.
+        """
+        
+        # Generate response from Gemini
+        try:
+            response = self.model.generate_content(prompt)
+            return response.text
+        except Exception as e:
+            logging.error(f"Error generating summary: {e}")
+            return "I'm terribly sorry, but I couldn't summarize the conversation at this time."
