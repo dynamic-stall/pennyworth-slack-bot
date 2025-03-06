@@ -109,7 +109,7 @@ jobs:
           
           COPY . .
           
-          CMD ["python", "main.py"]
+          CMD ["python", "server.py"]
           EOL
           fi
           
