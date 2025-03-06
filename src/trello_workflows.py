@@ -3,8 +3,13 @@ Trello integration module for Pennyworth Service Bot
 Handles Trello board, list, and card operations
 """
 
+import logging
 import trello
 from typing import Optional, List, Dict, Any
+from datetime import datetime, timedelta
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 class TrelloWorkflow:
     def __init__(self, api_key: str, api_secret: str, token: Optional[str] = None):
@@ -25,6 +30,10 @@ class TrelloWorkflow:
             'boards': {},
             'lists': {},
         }
+        # Channel mapping (board_id -> slack_channel_id)
+        self.channel_mapping = {}
+        
+        logger.info("Trello workflow manager initialized")
     
     def get_board(self, board_name: str) -> Optional[trello.Board]:
         """
@@ -47,6 +56,7 @@ class TrelloWorkflow:
                 self._cache['boards'][board_name] = board
                 return board
         
+        logger.warning(f"Board not found: {board_name}")
         return None
     
     def get_list(self, board_name: str, list_name: str) -> Optional[trello.List]:
@@ -72,12 +82,14 @@ class TrelloWorkflow:
             if lst.name.lower() == list_name.lower():
                 self._cache['lists'][cache_key] = lst
                 return lst
-                
+        
+        logger.warning(f"List not found: {list_name} on board {board_name}")        
         return None
     
     def create_card(self, board_name: str, list_name: str, 
                     title: str, description: Optional[str] = None, 
-                    labels: Optional[List[str]] = None) -> Dict[str, Any]:
+                    labels: Optional[List[str]] = None, 
+                    due_date: Optional[str] = None) -> Dict[str, Any]:
         """
         Create a new card in the specified list
         
@@ -87,6 +99,7 @@ class TrelloWorkflow:
             title (str): Card title
             description (str, optional): Card description
             labels (list, optional): List of label names to apply
+            due_date (str, optional): Due date in format YYYY-MM-DD
             
         Returns:
             Dict with card details or error info
@@ -109,6 +122,16 @@ class TrelloWorkflow:
                         if label.name.lower() == label_name.lower():
                             card.add_label(label)
             
+            # Set due date if provided
+            if due_date and card:
+                try:
+                    # Convert string to datetime
+                    due_datetime = datetime.strptime(due_date, "%Y-%m-%d")
+                    card.set_due(due_datetime.strftime("%Y-%m-%dT%H:%M:%S.000Z"))
+                except ValueError:
+                    logger.warning(f"Invalid due date format: {due_date}, expected YYYY-MM-DD")
+            
+            logger.info(f"Created card: '{title}' on board '{board_name}' in list '{list_name}'")
             return {
                 'success': True, 
                 'card_id': card.id, 
@@ -117,7 +140,7 @@ class TrelloWorkflow:
             }
             
         except Exception as e:
-            print(f"Error creating Trello card: {e}")
+            logger.error(f"Error creating Trello card: {e}")
             return {'success': False, 'error': str(e)}
     
     def move_card(self, card_id: str, target_list_name: str) -> Dict[str, Any]:
@@ -152,8 +175,197 @@ class TrelloWorkflow:
             # Move the card
             card.change_list(target_list.id)
             
+            logger.info(f"Moved card {card.name} to list {target_list_name}")
             return {'success': True, 'message': f"Card moved to {target_list_name}"}
             
         except Exception as e:
-            print(f"Error moving Trello card: {e}")
+            logger.error(f"Error moving Trello card: {e}")
             return {'success': False, 'error': str(e)}
+
+    def create_board(self, board_name: str, description: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Create a new Trello board
+        
+        Args:
+            board_name (str): Name for the new board
+            description (str, optional): Board description
+            
+        Returns:
+            Dict with operation status and board details
+        """
+        try:
+            # Create new board
+            new_board = self.client.add_board(board_name, desc=description or "")
+            
+            # Cache the new board
+            self._cache['boards'][board_name] = new_board
+            
+            logger.info(f"Created new board: {board_name}")
+            return {
+                'success': True,
+                'board_id': new_board.id,
+                'board_name': new_board.name,
+                'board_url': f"https://trello.com/b/{new_board.id}"  # Construct URL
+            }
+            
+        except Exception as e:
+            logger.error(f"Error creating Trello board: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def create_list(self, board_name: str, list_name: str) -> Dict[str, Any]:
+        """
+        Create a new list on a board
+        
+        Args:
+            board_name (str): Name of the board
+            list_name (str): Name for the new list
+            
+        Returns:
+            Dict with operation status
+        """
+        try:
+            board = self.get_board(board_name)
+            if not board:
+                return {'success': False, 'error': f"Board '{board_name}' not found"}
+            
+            # Create the list
+            new_list = board.add_list(list_name)
+            
+            # Update cache
+            cache_key = f"{board_name}:{list_name}"
+            self._cache['lists'][cache_key] = new_list
+            
+            logger.info(f"Created new list '{list_name}' on board '{board_name}'")
+            return {'success': True, 'list_name': list_name}
+            
+        except Exception as e:
+            logger.error(f"Error creating Trello list: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def add_comment(self, card_id: str, comment: str) -> Dict[str, Any]:
+        """
+        Add a comment to a card
+        
+        Args:
+            card_id (str): ID of the card
+            comment (str): Comment text
+            
+        Returns:
+            Dict with operation status
+        """
+        try:
+            card = self.client.get_card(card_id)
+            if not card:
+                return {'success': False, 'error': f"Card with ID '{card_id}' not found"}
+            
+            card.comment(comment)
+            
+            logger.info(f"Added comment to card {card.name}")
+            return {'success': True, 'message': "Comment added"}
+            
+        except Exception as e:
+            logger.error(f"Error adding comment to Trello card: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def archive_card(self, card_id: str) -> Dict[str, Any]:
+        """
+        Archive a card
+        
+        Args:
+            card_id (str): ID of the card to archive
+            
+        Returns:
+            Dict with operation status
+        """
+        try:
+            card = self.client.get_card(card_id)
+            if not card:
+                return {'success': False, 'error': f"Card with ID '{card_id}' not found"}
+            
+            card.set_closed(True)
+            
+            logger.info(f"Archived card {card.name}")
+            return {'success': True, 'message': "Card archived"}
+            
+        except Exception as e:
+            logger.error(f"Error archiving Trello card: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def map_board_to_channel(self, board_name: str, channel_id: str) -> Dict[str, Any]:
+        """
+        Link a Trello board to a Slack channel for notifications
+        
+        Args:
+            board_name (str): Name of the Trello board
+            channel_id (str): ID of the Slack channel
+            
+        Returns:
+            Dict with operation status
+        """
+        try:
+            board = self.get_board(board_name)
+            if not board:
+                return {'success': False, 'error': f"Board '{board_name}' not found"}
+            
+            self.channel_mapping[board.id] = channel_id
+            
+            logger.info(f"Mapped board '{board_name}' to Slack channel {channel_id}")
+            return {'success': True, 'message': f"Board '{board_name}' now linked to channel"}
+            
+        except Exception as e:
+            logger.error(f"Error mapping board to channel: {e}")
+            return {'success': False, 'error': str(e)}
+
+    def get_upcoming_due_cards(self, days_ahead: int = 2) -> List[Dict[str, Any]]:
+        """
+        Get cards with due dates within the specified number of days
+        
+        Args:
+            days_ahead (int): Number of days ahead to check
+            
+        Returns:
+            List of dictionaries with card details
+        """
+        upcoming_cards = []
+        today = datetime.now()
+        threshold = today + timedelta(days=days_ahead)
+        
+        try:
+            # Get all boards
+            boards = self.client.list_boards()
+            
+            for board in boards:
+                board_name = board.name
+                
+                # Check if this board is mapped to a channel
+                channel_id = self.channel_mapping.get(board.id)
+                
+                # Get all cards on the board
+                for lst in board.list_lists():
+                    for card in lst.list_cards():
+                        # Check if card has a due date
+                        if card.due_date:
+                            # Convert due date string to datetime
+                            try:
+                                due_date = datetime.strptime(card.due_date, "%Y-%m-%dT%H:%M:%S.%fZ")
+                                
+                                # Check if due date is within the threshold
+                                if today <= due_date <= threshold:
+                                    upcoming_cards.append({
+                                        'card_id': card.id,
+                                        'card_name': card.name,
+                                        'card_url': card.url,
+                                        'due_date': card.due_date,
+                                        'board_name': board_name,
+                                        'list_name': lst.name,
+                                        'channel_id': channel_id
+                                    })
+                            except ValueError:
+                                logger.warning(f"Invalid due date format for card {card.name}: {card.due_date}")
+            
+            logger.info(f"Found {len(upcoming_cards)} cards due in the next {days_ahead} days")
+            return upcoming_cards
+            
+        except Exception as e:
+            logger.error(f"Error checking for upcoming due cards: {e}")
+            return []
