@@ -74,12 +74,12 @@ jobs:
           ADMIN_CHANNEL=C0123456789
           EOL
 
-      - name: Setup gcloud CLI
-        uses: google-github-actions/setup-gcloud@v1
-        with:
+          - name: Setup gcloud CLI
+          uses: google-github-actions/setup-gcloud@v1
+          with:
             project_id: ${{ steps.bws.outputs.GCP_PROJECT_ID }}
             install_components: 'gke-gcloud-auth-plugin,beta'
-            
+        
       - name: Authenticate to Google Cloud
         id: auth
         run: |
@@ -94,14 +94,11 @@ jobs:
             
             # Clean up the key file
             rm /tmp/gcp-key.json
-          
+    
       - name: Deploy application
         run: |
             # Setup Docker Buildx
             sudo docker buildx create --use
-            
-            # Authenticate to Google Cloud  
-            gcloud auth activate-service-account --key-file <(echo ${{ steps.bws.outputs.GCP_SA_KEY }})
             
             # Create Dockerfile if it doesn't exist
             if [ ! -f Dockerfile ]; then
@@ -118,9 +115,6 @@ jobs:
             CMD ["python", "main.py"]
             EOL
             fi
-            
-            # Configure Docker for GCR
-            gcloud auth configure-docker
             
             # Build and push image to Google Container Registry
             sudo docker build -t gcr.io/${{ steps.bws.outputs.GCP_PROJECT_ID }}/pennyworth-bot:${{ github.sha }} .
@@ -174,7 +168,7 @@ jobs:
         if: always()
         uses: slackapi/slack-github-action@v1.25.0
         env:
-            SLACK_OAUTH_TOKEN: ${{ steps.bws.outputs.SLACK_OAUTH_TOKEN }}
+            SLACK_BOT_TOKEN: ${{ steps.bws.outputs.SLACK_OAUTH_TOKEN }}
         with:
             channel-id: ${{ steps.bws.outputs.SLACK_CHANNEL_ID }}
             payload: |
