@@ -94,7 +94,14 @@ jobs:
             
             # Clean up the key file
             rm /tmp/gcp-key.json
-    
+
+      - name: Create Artifact Registry Repository
+        run: |
+            gcloud artifacts repositories create pennyworth-images \
+                --repository-format=docker \
+                --location=us-central1 \
+                --project=${{ steps.bws.outputs.GCP_PROJECT_ID }} || true
+
       - name: Deploy application
         run: |
             # Setup Docker Buildx
@@ -117,12 +124,12 @@ jobs:
             fi
             
             # Build and push image to Google Container Registry
-            sudo docker build -t gcr.io/${{ steps.bws.outputs.GCP_PROJECT_ID }}/pennyworth-bot:${{ github.sha }} .
-            sudo docker push gcr.io/${{ steps.bws.outputs.GCP_PROJECT_ID }}/pennyworth-bot:${{ github.sha }}
+            sudo docker build -t us-central1-docker.pkg.dev/${{ steps.bws.outputs.GCP_PROJECT_ID }}/pennyworth-images/pennyworth-bot:${{ github.sha }} .
+            sudo docker push us-central1-docker.pkg.dev/${{ steps.bws.outputs.GCP_PROJECT_ID }}/pennyworth-images/pennyworth-bot:${{ github.sha }}
             
             # Deploy to Cloud Run
             gcloud run deploy pennyworth-bot \
-                --image gcr.io/${{ steps.bws.outputs.GCP_PROJECT_ID }}/pennyworth-bot:${{ github.sha }} \
+                --image us-central1-docker.pkg.dev/${{ steps.bws.outputs.GCP_PROJECT_ID }}/pennyworth-images/pennyworth-bot:${{ github.sha }} \
                 --platform managed \
                 --region us-central1 \
                 --memory 256Mi \
