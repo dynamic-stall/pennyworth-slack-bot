@@ -104,10 +104,27 @@ jobs:
           
           WORKDIR /app
           
+          # Install required packages
+          RUN apt-get update && apt-get install -y --no-install-recommends \\
+            curl \\
+            && rm -rf /var/lib/apt/lists/*
+
           COPY requirements.txt .
           RUN pip install --no-cache-dir -r requirements.txt
           
+          # Copy application code
           COPY . .
+          
+          # Check contents for debugging
+          RUN ls -la
+
+          EXPOSE 8080
+
+          # Set environment variables
+          ENV PYTHONUNBUFFERED=1
+
+          # Debug Python version
+          RUN python --version
           
           CMD ["python", "server.py"]
           EOL
@@ -154,6 +171,7 @@ jobs:
             --set-env-vars "SERVICE_EMAIL=${{ vars.SVC_ACCT_EMAIL }}" \
             --set-env-vars "LOG_LEVEL=INFO" \
             --set-env-vars "ADMIN_CHANNEL=${{ steps.bws.outputs.SLACK_CHANNEL_ID }}" \
+            --timeout 300s \
             --project ${{ steps.bws.outputs.GCP_PROJECT_ID }} \
             --quiet
               
