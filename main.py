@@ -40,25 +40,79 @@ trello_workflow = TrelloWorkflow(
     token=os.getenv('TRELLO_TOKEN')
 )
 
+# Pennyworth name addressee helper function
+def get_preferred_name(user_info):
+    """
+    Get the preferred name to address a user according to precedence rules:
+    1. Display name if available
+    2. First name (ignoring honorifics) if available
+    3. Full real name if no spaces
+    """
+    # Try to get profile info
+    profile = user_info.get('profile', {})
+    
+    # Check for display name (highest precedence)
+    display_name = profile.get('display_name')
+    if display_name and display_name.strip():
+        return display_name.strip()
+    
+    # Check for real name
+    real_name = profile.get('real_name')
+    if not real_name or not real_name.strip():
+        return None
+        
+    real_name = real_name.strip()
+    
+    # If no spaces, use the whole name
+    if ' ' not in real_name:
+        return real_name
+    
+    # Split by spaces to get parts
+    name_parts = real_name.split()
+    
+    # Check for honorifics to skip
+    honorifics = ['mr', 'ms', 'mrs', 'dr', 'prof', 'sir', 'madam', 'miss', 'lord', 'lady', 'rev']
+    if name_parts[0].lower().rstrip('.') in honorifics and len(name_parts) > 1:
+        # Skip the honorific and use the next part
+        return name_parts[1]
+    else:
+        # Otherwise use the first part
+        return name_parts[0]
+
 # Register event handlers
 @app.event("team_join")
 def handle_team_join(event, say):
     """Handle when a new user joins the team"""
     user = event["user"]
     welcome_message = (
-        f"Welcome to the team, <@{user['id']}>! 🎉\n\n"
-        "I'm Pennyworth, your service bot. Here's what you need to know:\n"
-        "• Check out our onboarding resources\n"
-        "• Join relevant Slack channels\n"
-        "• Set up your workspace profile"
+        f"Good day, Master <@{user['id']}>. Welcome to the manor. 🎩\n\n"
+        "I'm Pennyworth, your digital butler. Allow me to assist with your orientation:\n"
+        "• The study contains our documentation resources\n"
+        "• The common areas host our various communication channels\n"
+        "• Your quarters await your personal profile setup\n\n"
+        "Should you require anything, simply summon me."
     )
     say(welcome_message)
     
-    # Notify a specific channel about the new user
-    admin_channel = os.getenv('ADMIN_CHANNEL', 'C0123456789')
+    # Notify a specific channel about the new user with Alfred-style formality
+    social_channel = os.getenv('SOCIAL_CHANNEL', 'C08DVCABRM0')
+    
+    # Create a formal butler-style announcement
+    announcement = (
+        f"*Announcing a new arrival* 🎩\n\n"
+        f"May I present <@{user['id']}>, who has just joined our distinguished company.\n\n"
+        f"*For those unfamiliar with my services:*\n"
+        f"• Summon me with `!ai [your question]` for assistance with inquiries\n"
+        f"• Use `!trello` commands to manage your project organization\n"
+        f"• Try `!summarize` in any channel to receive a concise briefing of recent discussions\n\n"
+        f"I shall be attending to Master <@{user['id']}>'s orientation. Do make them feel welcome.\n"
+        f"As always, I remain at your service in all channels. Simply call when needed."
+    )
+    
     app.client.chat_postMessage(
-        channel=admin_channel,
-        text=f"New team member alert! <@{user['id']}> has joined the workspace."
+        channel=social_channel,
+        text=announcement,
+        unfurl_links=False
     )
 
 @app.message(re.compile(r"^!ai"))
@@ -154,7 +208,17 @@ def handle_trello_command(message, say):
             say(f"*Lists in {board_name}*\n• " + "\n• ".join(list_names))
         else:
             say(f"Board '{board_name}' not found.")
-    
+
+    elif command == "create-board" and len(parts) >= 2:
+        # Format: !trello create-board [board_name]
+        board_name = parts[1]
+        result = trello_workflow.create_board(board_name)
+        
+        if result.get('success'):
+            say(f"Board created: {result['board_name']}\nURL: {result['board_url']}")
+        else:
+            say(f"Failed to create board: {result.get('error', 'Unknown error')}")
+
     else:
         say("Unknown command. Try `!trello help` for available commands.")
 
