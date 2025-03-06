@@ -84,8 +84,17 @@ def get_preferred_name(user_info):
 def handle_team_join(event, say):
     """Handle when a new user joins the team"""
     user = event["user"]
+    
+    # Get workspace name
+    try:
+        workspace_info = app.client.team_info()
+        workspace_name = workspace_info["team"]["name"]
+    except Exception as e:
+        logger.warning(f"Could not retrieve workspace name: {e}")
+        workspace_name = "the manor"
+    
     welcome_message = (
-        f"Good day, Master <@{user['id']}>. Welcome to the manor. 🎩\n\n"
+        f"Good day, Master <@{user['id']}>. Welcome to {workspace_name}. 🎩\n\n"
         "I'm Pennyworth, your digital butler. Allow me to assist with your orientation:\n"
         "• The study contains our documentation resources\n"
         "• The common areas host our various communication channels\n"
@@ -93,7 +102,7 @@ def handle_team_join(event, say):
         "Should you require anything, simply summon me."
     )
     say(welcome_message)
-    
+       
     # Notify a specific channel about the new user with Alfred-style formality
     social_channel = os.getenv('SOCIAL_CHANNEL', 'C08DVCABRM0')
     
@@ -130,9 +139,13 @@ def handle_ai_request(message, say):
     user_id = message.get('user')
     user_info = app.client.users_info(user=user_id).get('user', {})
     
-    # Generate AI response with user context
+    # Get preferred name using our helper
+    preferred_name = get_preferred_name(user_info)
+    
+    # Generate AI response with enhanced user context
     context = {
-        "user_name": user_info.get('real_name', ''),
+        "user": user_id,
+        "preferred_name": preferred_name,
         "channel": message.get('channel', '')
     }
     
