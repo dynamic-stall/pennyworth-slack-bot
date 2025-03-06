@@ -74,9 +74,9 @@ jobs:
           ADMIN_CHANNEL=C0123456789
           EOL
 
-          - name: Setup gcloud CLI
-          uses: google-github-actions/setup-gcloud@v1
-          with:
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v1
+        with:
             project_id: ${{ steps.bws.outputs.GCP_PROJECT_ID }}
             install_components: 'gke-gcloud-auth-plugin,beta'
             
