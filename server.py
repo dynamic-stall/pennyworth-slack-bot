@@ -4,11 +4,19 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from slack_bolt import App
 from dotenv import load_dotenv
 
-# Configure basic logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 load_dotenv()
+app = App(
+    token=os.getenv('SLACK_BOT_TOKEN'),
+    signing_secret=os.getenv('SLACK_SIGNING_SECRET')
+)
+
+# Add one simple bot handler but don't start the bot yet
+@app.message("hello")
+def say_hello(message, say):
+    say(f"Hello there, <@{message['user']}>!")
 
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
