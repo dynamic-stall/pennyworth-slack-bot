@@ -24,59 +24,59 @@ jobs:
         id: bws
         uses: bitwarden/sm-action@v2
         with:
-          access_token: ${{ secrets.BW_ACCESS_TOKEN }}
-          base_url: https://vault.bitwarden.com
-          secrets: |
-            c9b70456-681a-4ce3-be4f-b289016dd68c > SLACK_OAUTH_TOKEN
-            b6282a0a-c5e7-4e5b-95c7-b2970171667c > SLACK_APP_TOKEN
-            32a18ec3-e9c6-4de1-9112-b297017087f0 > SLACK_SIGNING_SECRET
-            9e95df6c-4036-418e-98ae-b2890174cfb5 > SLACK_CHANNEL_ID
-            1f995ad3-5630-4a07-8d6b-b2550186c343 > GEMINI_API_KEY
-            1057ab45-80e4-498b-a18c-b297017e15ee > TRELLO_API_KEY
-            0e194f90-5817-4a54-ac8c-b297017e3cef > TRELLO_API_SECRET
-            c75d328d-8699-4fb3-bb5e-b2980000422f > TRELLO_TOKEN
-            e09a916c-4569-4b99-96c3-b2980006da29 > GCP_PROJECT_ID
-            bf5c0050-1ea5-4e3c-bb04-b2980009024a > GCP_SA_KEY        
+            access_token: ${{ secrets.BW_ACCESS_TOKEN }}
+            base_url: https://vault.bitwarden.com
+            secrets: |
+                c9b70456-681a-4ce3-be4f-b289016dd68c > SLACK_OAUTH_TOKEN
+                b6282a0a-c5e7-4e5b-95c7-b2970171667c > SLACK_APP_TOKEN
+                32a18ec3-e9c6-4de1-9112-b297017087f0 > SLACK_SIGNING_SECRET
+                9e95df6c-4036-418e-98ae-b2890174cfb5 > SLACK_CHANNEL_ID
+                1f995ad3-5630-4a07-8d6b-b2550186c343 > GEMINI_API_KEY
+                1057ab45-80e4-498b-a18c-b297017e15ee > TRELLO_API_KEY
+                0e194f90-5817-4a54-ac8c-b297017e3cef > TRELLO_API_SECRET
+                c75d328d-8699-4fb3-bb5e-b2980000422f > TRELLO_TOKEN
+                e09a916c-4569-4b99-96c3-b2980006da29 > GCP_PROJECT_ID
+                bf5c0050-1ea5-4e3c-bb04-b2980009024a > GCP_SA_KEY        
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ vars.PYTHON_VERSION }}
-          cache: 'pip'
+            python-version: ${{ vars.PYTHON_VERSION }}
+            cache: 'pip'
       
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
+            python -m pip install --upgrade pip
+            pip install -r requirements.txt
         
       - name: Set up application configuration
         run: |
-          # Create config file with secrets
-          cat > .env <<EOL
-          # Slack Configuration
-          SLACK_BOT_TOKEN=${{ steps.bws.outputs.SLACK_OAUTH_TOKEN }}
-          SLACK_APP_TOKEN=${{ steps.bws.outputs.SLACK_APP_TOKEN }}
-          SLACK_SIGNING_SECRET=${{ steps.bws.outputs.SLACK_SIGNING_SECRET }}
-          
-          # Google Gemini Configuration
-          GOOGLE_GEMINI_API_KEY=${{ steps.bws.outputs.GEMINI_API_KEY }}
-          
-          # Trello Configuration
-          TRELLO_API_KEY=${{ steps.bws.outputs.TRELLO_API_KEY }}
-          TRELLO_API_SECRET=${{ steps.bws.outputs.TRELLO_API_SECRET }}
-          TRELLO_TOKEN=${{ steps.bws.outputs.TRELLO_TOKEN }}
+            # Create config file with secrets
+            cat > .env <<EOL
+            # Slack Configuration
+            SLACK_BOT_TOKEN=${{ steps.bws.outputs.SLACK_OAUTH_TOKEN }}
+            SLACK_APP_TOKEN=${{ steps.bws.outputs.SLACK_APP_TOKEN }}
+            SLACK_SIGNING_SECRET=${{ steps.bws.outputs.SLACK_SIGNING_SECRET }}
+            
+            # Google Gemini Configuration
+            GOOGLE_GEMINI_API_KEY=${{ steps.bws.outputs.GEMINI_API_KEY }}
+            
+            # Trello Configuration
+            TRELLO_API_KEY=${{ steps.bws.outputs.TRELLO_API_KEY }}
+            TRELLO_API_SECRET=${{ steps.bws.outputs.TRELLO_API_SECRET }}
+            TRELLO_TOKEN=${{ steps.bws.outputs.TRELLO_TOKEN }}
 
-          # Email Configuration
-          SERVICE_EMAIL=${{ vars.SVC_ACCT_EMAIL }}
+            # Email Configuration
+            SERVICE_EMAIL=${{ vars.SVC_ACCT_EMAIL }}
 
-          # Application Configuration
-          LOG_LEVEL=INFO
-          ADMIN_CHANNEL=C0123456789
-          EOL
+            # Application Configuration
+            LOG_LEVEL=INFO
+            ADMIN_CHANNEL=C0123456789
+            EOL
 
-          - name: Setup gcloud CLI
-          uses: google-github-actions/setup-gcloud@v1
-          with:
+      - name: Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v1
+        with:
             project_id: ${{ steps.bws.outputs.GCP_PROJECT_ID }}
             install_components: 'gke-gcloud-auth-plugin,beta'
         
