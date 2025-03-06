@@ -89,8 +89,8 @@ jobs:
             # Authenticate with the service account
             gcloud auth activate-service-account --key-file=/tmp/gcp-key.json
             
-            # Configure Docker for GCR
-            gcloud auth configure-docker --quiet
+            # Generate Docker credentials specifically
+            gcloud auth print-access-token | docker login -u oauth2accesstoken --password-stdin https://gcr.io
             
             # Clean up the key file
             rm /tmp/gcp-key.json
