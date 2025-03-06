@@ -1,4 +1,4 @@
-name: Deploy Pennyworth Service Bot (Slack)
+name: Deploy Pennyworth AI Slack Bot
 
 on:
   push:
@@ -58,6 +58,9 @@ jobs:
             SLACK_APP_TOKEN=${{ steps.bws.outputs.SLACK_APP_TOKEN }}
             SLACK_SIGNING_SECRET=${{ steps.bws.outputs.SLACK_SIGNING_SECRET }}
             
+            # Chat Settings
+            TIMEZONE=${{ vars.TIMEZONE }}
+
             # Google Gemini Configuration
             GOOGLE_GEMINI_API_KEY=${{ steps.bws.outputs.GEMINI_API_KEY }}
             
@@ -164,6 +167,7 @@ jobs:
             --set-env-vars "SLACK_BOT_TOKEN=${{ steps.bws.outputs.SLACK_OAUTH_TOKEN }}" \
             --set-env-vars "SLACK_APP_TOKEN=${{ steps.bws.outputs.SLACK_APP_TOKEN }}" \
             --set-env-vars "SLACK_SIGNING_SECRET=${{ steps.bws.outputs.SLACK_SIGNING_SECRET }}" \
+            --set-env-vars "TIMEZONE=${{ vars.TIMEZONE }}" \
             --set-env-vars "GOOGLE_GEMINI_API_KEY=${{ steps.bws.outputs.GEMINI_API_KEY }}" \
             --set-env-vars "TRELLO_API_KEY=${{ steps.bws.outputs.TRELLO_API_KEY }}" \
             --set-env-vars "TRELLO_API_SECRET=${{ steps.bws.outputs.TRELLO_API_SECRET }}" \
@@ -211,7 +215,7 @@ jobs:
                     "type": "header",
                     "text": {
                         "type": "plain_text",
-                        "text": "${{ job.status == 'success' && '✅' || '❌' }} Pennyworth AI Bot: ${{ job.status }}",
+                        "text": "${{ job.status == 'success' && '✅' || '❌' }} Pennyworth Slack Bot: ${{ job.status }}",
                         "emoji": true
                     }
                     },
