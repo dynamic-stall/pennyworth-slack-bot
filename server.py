@@ -1,10 +1,14 @@
 import os
 import logging
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from slack_bolt import App
+from dotenv import load_dotenv
 
 # Configure basic logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+load_dotenv()
 
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -17,7 +21,6 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
         logger.info("%s - %s" % (self.address_string(), format % args))
 
 def run_server():
-    # Get port from environment variable
     port = int(os.environ.get('PORT', 8080))
     server_address = ('', port)
     
