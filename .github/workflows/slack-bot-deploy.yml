@@ -19,18 +19,7 @@ jobs:
         id: start-time
         if: always()
         run: echo "start_time=$(date +%s)" >> $GITHUB_OUTPUT
-        
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ vars.PYTHON_VERSION }}
-          cache: 'pip'
-      
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-      
+
       - name: Get Secrets from Bitwarden
         id: bws
         uses: bitwarden/sm-action@v2
@@ -47,9 +36,19 @@ jobs:
             0e194f90-5817-4a54-ac8c-b297017e3cef > TRELLO_API_SECRET
             c75d328d-8699-4fb3-bb5e-b2980000422f > TRELLO_TOKEN
             e09a916c-4569-4b99-96c3-b2980006da29 > GCP_PROJECT_ID
-            bf5c0050-1ea5-4e3c-bb04-b2980009024a > GCP_SA_KEY
-  
+            bf5c0050-1ea5-4e3c-bb04-b2980009024a > GCP_SA_KEY        
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ vars.PYTHON_VERSION }}
+          cache: 'pip'
       
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+        
       - name: Set up application configuration
         run: |
           # Create config file with secrets
@@ -74,11 +73,32 @@ jobs:
           LOG_LEVEL=INFO
           ADMIN_CHANNEL=C0123456789
           EOL
-      
+
+          - name: Setup gcloud CLI
+          uses: google-github-actions/setup-gcloud@v1
+          with:
+            project_id: ${{ steps.bws.outputs.GCP_PROJECT_ID }}
+            install_components: 'gke-gcloud-auth-plugin,beta'
+            
+      - name: Authenticate to Google Cloud
+        id: auth
+        run: |
+            # Write the JSON key to a temporary file
+            echo '${{ steps.bws.outputs.GCP_SA_KEY }}' > /tmp/gcp-key.json
+            
+            # Authenticate with the service account
+            gcloud auth activate-service-account --key-file=/tmp/gcp-key.json
+            
+            # Configure Docker for GCR
+            gcloud auth configure-docker --quiet
+            
+            # Clean up the key file
+            rm /tmp/gcp-key.json
+          
       - name: Deploy application
         run: |
             # Setup Docker Buildx
-            docker buildx create --use
+            sudo docker buildx create --use
             
             # Authenticate to Google Cloud  
             gcloud auth activate-service-account --key-file <(echo ${{ steps.bws.outputs.GCP_SA_KEY }})
@@ -103,8 +123,8 @@ jobs:
             gcloud auth configure-docker
             
             # Build and push image to Google Container Registry
-            docker build -t gcr.io/${{ steps.bws.outputs.GCP_PROJECT_ID }}/pennyworth-bot:${{ github.sha }} .
-            docker push gcr.io/${{ steps.bws.outputs.GCP_PROJECT_ID }}/pennyworth-bot:${{ github.sha }}
+            sudo docker build -t gcr.io/${{ steps.bws.outputs.GCP_PROJECT_ID }}/pennyworth-bot:${{ github.sha }} .
+            sudo docker push gcr.io/${{ steps.bws.outputs.GCP_PROJECT_ID }}/pennyworth-bot:${{ github.sha }}
             
             # Deploy to Cloud Run
             gcloud run deploy pennyworth-bot \
