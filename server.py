@@ -1,13 +1,9 @@
 import os
-import threading
 import logging
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from main import start_bot
 
-logging.basicConfig(
-    level=os.getenv('LOG_LEVEL', 'INFO'),
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+# Configure basic logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class HealthCheckHandler(BaseHTTPRequestHandler):
@@ -15,26 +11,27 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header('Content-type', 'text/plain')
         self.end_headers()
-        self.wfile.write(b'OK')
-        
+        self.wfile.write(b'Health check OK')
+    
     def log_message(self, format, *args):
-        # Override to use our logger
         logger.info("%s - %s" % (self.address_string(), format % args))
 
 def run_server():
+    # Get port from environment variable
     port = int(os.environ.get('PORT', 8080))
     server_address = ('', port)
-    httpd = HTTPServer(server_address, HealthCheckHandler)
-    logger.info(f"Starting health check server on port {port}")
-    httpd.serve_forever()
+    
+    logger.info(f"Starting server on port {port}")
+    
+    try:
+        httpd = HTTPServer(server_address, HealthCheckHandler)
+        logger.info(f"Server started successfully")
+        httpd.serve_forever()
+    except Exception as e:
+        logger.error(f"Error starting server: {e}")
+        raise
 
 if __name__ == "__main__":
-    # Start the bot in a separate thread
-    logger.info("Starting bot thread")
-    bot_thread = threading.Thread(target=start_bot)
-    bot_thread.daemon = True
-    bot_thread.start()
-    
-    # Run the HTTP server in the main thread
-    logger.info("Starting HTTP server")
+    # Start with very basic functionality - just the HTTP server
+    print(f"DEBUGGING: Starting simple HTTP server")
     run_server()
