@@ -9,6 +9,7 @@ import datetime
 import pytz
 import re
 import slack_bolt
+from slack_bolt.adapter.socket_mode import SocketModeHandler
 import google.generativeai as genai
 from dotenv import load_dotenv
 import trello
@@ -557,7 +558,7 @@ CONVERSATION:
         # Start the Slack bot
         try:
             logger.info("Starting Pennyworth Bot in Socket Mode")
-            handler = slack_bolt.adapter.socket_mode.SocketModeHandler(
+            handler = SocketModeHandler(
                 self.slack_app, 
                 os.getenv('SLACK_APP_TOKEN')
             )
