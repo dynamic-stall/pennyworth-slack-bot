@@ -1,16 +1,17 @@
 # Core dependencies
-slack_bolt>=1.22.0
-slack_sdk>=3.34.0
+slack_bolt>=1.28.0  # Updated from 1.22.0
+slack_sdk>=3.35.0   # Updated from 3.34.0
 google-generativeai>=0.8.4
 python-dotenv>=1.0.1
 requests>=2.32.3
+pytz>=2024.1
 
 # Trello integration
-py-trello>=0.19.0  # Using py-trello instead of trello.py for better maintenance
+py-trello>=0.20.0  # Updated from 0.19.0 for improved Python 3.11 compatibility
 
 # Optional utilities
 pillow>=11.0.0
-pydantic>=2.10.6
+pydantic>=2.10.6  
 schedule>=1.2.2
 tqdm>=4.67.1
 
