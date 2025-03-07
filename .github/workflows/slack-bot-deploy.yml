@@ -30,7 +30,10 @@ jobs:
                 c9b70456-681a-4ce3-be4f-b289016dd68c > SLACK_OAUTH_TOKEN
                 b6282a0a-c5e7-4e5b-95c7-b2970171667c > SLACK_APP_TOKEN
                 32a18ec3-e9c6-4de1-9112-b297017087f0 > SLACK_SIGNING_SECRET
-                9e95df6c-4036-418e-98ae-b2890174cfb5 > SLACK_CHANNEL_ID
+                9e95df6c-4036-418e-98ae-b2890174cfb5 > SLACK_CHANNEL_ID_UPPERYARD
+                32849099-d59f-4352-8343-b298013b178e > SLACK_CHANNEL_ID_GALLEY
+                39bb8999-cc17-4175-b523-b298017519b4 > SLACK_CHANNEL_ID_AFROTAKU
+                0df2aa39-b67e-4a92-b68c-b29801732b31 > SLACK_CHANNEL_ID_UXOPS
                 1f995ad3-5630-4a07-8d6b-b2550186c343 > GEMINI_API_KEY
                 1057ab45-80e4-498b-a18c-b297017e15ee > TRELLO_API_KEY
                 0e194f90-5817-4a54-ac8c-b297017e3cef > TRELLO_API_SECRET
@@ -57,12 +60,16 @@ jobs:
             SLACK_BOT_TOKEN=${{ steps.bws.outputs.SLACK_OAUTH_TOKEN }}
             SLACK_APP_TOKEN=${{ steps.bws.outputs.SLACK_APP_TOKEN }}
             SLACK_SIGNING_SECRET=${{ steps.bws.outputs.SLACK_SIGNING_SECRET }}
+            GALLEY_CHANNEL=${{ steps.bws.outputs.SLACK_CHANNEL_ID_GALLEY }}
+            AFROTAKU_CHANNEL=${{ steps.bws.outputs.SLACK_CHANNEL_ID_AFROTAKU }}
+            UXOPS_CHANNEL=${{ steps.bws.outputs.SLACK_CHANNEL_ID_UXOPS }}
             
             # Chat Settings
             TIMEZONE=${{ vars.TIMEZONE }}
 
             # Google Gemini Configuration
             GOOGLE_GEMINI_API_KEY=${{ steps.bws.outputs.GEMINI_API_KEY }}
+            GEMINI_MODEL=${{ vars.GEMINI_MODEL }}
             
             # Trello Configuration
             TRELLO_API_KEY=${{ steps.bws.outputs.TRELLO_API_KEY }}
@@ -167,14 +174,18 @@ jobs:
             --set-env-vars "SLACK_BOT_TOKEN=${{ steps.bws.outputs.SLACK_OAUTH_TOKEN }}" \
             --set-env-vars "SLACK_APP_TOKEN=${{ steps.bws.outputs.SLACK_APP_TOKEN }}" \
             --set-env-vars "SLACK_SIGNING_SECRET=${{ steps.bws.outputs.SLACK_SIGNING_SECRET }}" \
+            --set-env-vars "GALLEY_CHANNEL"="${{ steps.bws.outputs.SLACK_CHANNEL_ID_GALLEY }}" \
+            --set-env-vars "AFROTAKU_CHANNEL"="${{ steps.bws.outputs.SLACK_CHANNEL_ID_AFROTAKU }}" \
+            --set-env-vars "UXOPS_CHANNEL"="${{ steps.bws.outputs.SLACK_CHANNEL_ID_UXOPS }}" \
             --set-env-vars "TIMEZONE=${{ vars.TIMEZONE }}" \
             --set-env-vars "GOOGLE_GEMINI_API_KEY=${{ steps.bws.outputs.GEMINI_API_KEY }}" \
+            --set-env-vars "GEMINI_MODEL=${{ vars.GEMINI_MODEL }}" \
             --set-env-vars "TRELLO_API_KEY=${{ steps.bws.outputs.TRELLO_API_KEY }}" \
             --set-env-vars "TRELLO_API_SECRET=${{ steps.bws.outputs.TRELLO_API_SECRET }}" \
             --set-env-vars "TRELLO_TOKEN=${{ steps.bws.outputs.TRELLO_TOKEN }}" \
             --set-env-vars "SERVICE_EMAIL=${{ vars.SVC_ACCT_EMAIL }}" \
             --set-env-vars "LOG_LEVEL=INFO" \
-            --set-env-vars "ADMIN_CHANNEL=${{ steps.bws.outputs.SLACK_CHANNEL_ID }}" \
+            --set-env-vars "ADMIN_CHANNEL=${{ steps.bws.outputs.SLACK_CHANNEL_ID_UPPERYARD }}" \
             --timeout 300s \
             --project ${{ steps.bws.outputs.GCP_PROJECT_ID }} \
             --quiet
@@ -206,7 +217,7 @@ jobs:
         env:
             SLACK_BOT_TOKEN: ${{ steps.bws.outputs.SLACK_OAUTH_TOKEN }}
         with:
-            channel-id: ${{ steps.bws.outputs.SLACK_CHANNEL_ID }}
+            channel-id: ${{ steps.bws.outputs.SLACK_CHANNEL_ID_UPPERYARD }}
             payload: |
                 {
                 "text": "Workflow ${{ job.status }}: Pennyworth AI Slack Bot Application",

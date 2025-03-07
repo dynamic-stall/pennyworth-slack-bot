@@ -8,6 +8,10 @@ from dotenv import load_dotenv
 import datetime
 import pytz
 import random
+import re
+
+# Import components from main.py
+from main import app, start_bot
 
 # Configure logging and environment
 logging.basicConfig(
