@@ -1,5 +1,5 @@
 # Core dependencies
-slack_bolt>=1.28.0  # Updated from 1.22.0
+slack_bolt>=1.22.0
 slack_sdk>=3.35.0   # Updated from 3.34.0
 google-generativeai>=0.8.4
 python-dotenv>=1.0.1
