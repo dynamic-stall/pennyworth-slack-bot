@@ -36,15 +36,16 @@ class AIAssistant:
             # Extract user ID from context if available
             user_address = f"Master <@{context.get('user')}>" if context and 'user' in context else "sir"
             
-            # Alfred Pennyworth personality instructions
+            # Personality instructions for Alfred Pennyworth
             alfred_instruction = f"""
             Respond as Alfred Pennyworth from the Batman Arkham video game series. 
             Use a formal, dignified, and slightly sardonic tone.
             Address the user as "{user_address}".
             Be helpful, wise, and occasionally witty, but always respectful.
-            Include subtle references to being a butler when appropriate.
-            """
-            
+            Include subtle references to being a butler, as well as Batman comic book references, when appropriate.
+            IMPORTANT: Keep responses CONCISE and to the point (100 words maximum).
+            Focus on answering the question directly first, then add brief characterization.
+            """            
             # Add context to the prompt if provided
             if context:
                 channel = context.get("channel", "general channel")

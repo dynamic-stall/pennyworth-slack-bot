@@ -218,7 +218,7 @@ Include:
 - Potential first steps
 - Key considerations
 
-Write in the style of Alfred Pennyworth from the Batman Arkham games:
+Write in the style of Alfred Pennyworth from the Batman Arkham video game series:
 formal, dignified, and slightly sardonic.
 """
             response = self.ai_model.generate_content(description_prompt)
@@ -282,11 +282,13 @@ formal, dignified, and slightly sardonic.
                 
                 # Otherwise, process as an AI query similar to !ai command
                 alfred_prompt = f"""
-You are Alfred Pennyworth from the Batman Arkham video game series.
+Respond as Alfred Pennyworth from the Batman Arkham video game series. 
 Use a formal, dignified, and slightly sardonic tone.
 Address the user as "{user_address}".
 Be helpful, wise, and occasionally witty, but always respectful.
-Include subtle references to being a butler when appropriate.
+Include subtle references to being a butler, as well as Batman comic book references, when appropriate.
+IMPORTANT: Keep responses CONCISE and to the point (100 words maximum).
+Focus on answering the question directly first, then add brief characterization.
 
 User query: {message_text}
 """
