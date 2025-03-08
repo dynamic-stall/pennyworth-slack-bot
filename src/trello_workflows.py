@@ -12,7 +12,8 @@ from datetime import datetime, timedelta
 logger = logging.getLogger(__name__)
 
 class TrelloWorkflow:
-    def __init__(self, api_key: str, api_secret: str, token: Optional[str] = None):
+    def __init__(self, api_key: str = None, api_secret: str = None, token: Optional[str] = None, 
+                trello_client: Any = None, ai_generator: Any = None):
         """
         Initialize Trello workflow manager
         
@@ -20,12 +21,18 @@ class TrelloWorkflow:
             api_key (str): Trello API key
             api_secret (str): Trello API secret
             token (str, optional): Trello token for authenticated operations
+            trello_client (Any, optional): Existing Trello client
+            ai_generator (Any, optional): Function for generating task descriptions
         """
-        self.client = trello.TrelloClient(
-            api_key=api_key,
-            api_secret=api_secret,
-            token=token
-        )
+        if trello_client:
+            self.client = trello_client
+        else:
+            self.client = trello.TrelloClient(
+                api_key=api_key,
+                api_secret=api_secret,
+                token=token
+            )
+        self.ai_generator = ai_generator
         self._cache = {
             'boards': {},
             'lists': {},
@@ -34,7 +41,7 @@ class TrelloWorkflow:
         self.channel_mapping = {}
         
         logger.info("Trello workflow manager initialized")
-    
+
     def get_board(self, board_name: str) -> Optional[trello.Board]:
         """
         Get a board by name
@@ -369,3 +376,96 @@ class TrelloWorkflow:
         except Exception as e:
             logger.error(f"Error checking for upcoming due cards: {e}")
             return []
+
+    def get_boards(self) -> Dict[str, Any]:
+        """
+        Get all available Trello boards
+        
+        Returns:
+            Dict with boards list and status
+        """
+        try:
+            boards = self.client.list_boards()
+            return {
+                "success": True,
+                "boards": [{"name": b.name, "id": b.id} for b in boards]
+            }
+        except Exception as e:
+            logger.error(f"Error retrieving Trello boards: {str(e)}")
+            return {"success": False, "error": str(e)}
+            
+    def get_lists(self, board_name: str) -> Dict[str, Any]:
+        """
+        Get all lists for a given board
+        
+        Args:
+            board_name: Name of the board
+            
+        Returns:
+            Dict with lists and status
+        """
+        try:
+            board = self.get_board(board_name)
+            if not board:
+                return {
+                    "success": False,
+                    "error": f"Board '{board_name}' not found"
+                }
+                
+            lists = board.list_lists()
+            
+            return {
+                "success": True,
+                "board_name": board.name,
+                "lists": [{"name": lst.name, "id": lst.id} for lst in lists]
+            }
+        except Exception as e:
+            logger.error(f"Error retrieving lists for board '{board_name}': {str(e)}")
+            return {"success": False, "error": str(e)}
+
+    def parse_command(self, command_text: str) -> tuple:
+        """
+        Parse a Trello command string
+        
+        Args:
+            command_text: Full command text (without !trello prefix)
+            
+        Returns:
+            Tuple of command name and parsed arguments
+        """
+        parts = command_text.strip().split(' ', 1)
+        command = parts[0].lower() if parts else ""
+        args = {}
+        
+        if len(parts) > 1:
+            remainder = parts[1].strip()
+            
+            if command == "create":
+                # Format: create Card Title in List Name
+                if " in " in remainder:
+                    card_title, list_name = remainder.split(" in ", 1)
+                    args["card_title"] = card_title.strip()
+                    args["list_name"] = list_name.strip()
+                else:
+                    args["card_title"] = remainder
+                    args["list_name"] = "To Do"  # Default
+            
+            elif command == "lists":
+                # Format: lists Board Name
+                args["board_name"] = remainder
+            
+            elif command == "comment":
+                # Format: comment card_id Comment text
+                comment_parts = remainder.split(' ', 1)
+                if len(comment_parts) >= 2:
+                    args["card_id"] = comment_parts[0].strip()
+                    args["comment_text"] = comment_parts[1].strip()
+                    
+            elif command == "move":
+                # Format: move card_id to List Name
+                if " to " in remainder:
+                    card_id, list_name = remainder.split(" to ", 1)
+                    args["card_id"] = card_id.strip()
+                    args["list_name"] = list_name.strip()
+        
+        return command, args

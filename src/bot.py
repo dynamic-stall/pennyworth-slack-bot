@@ -12,7 +12,7 @@ from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 import google.generativeai as genai
 from dotenv import load_dotenv
-import trello
+from src.trello_workflows import TrelloWorkflow
 from typing import Optional, Dict, Any, Callable, List
 
 # Configure logging
@@ -40,10 +40,11 @@ class PennyworthBot:
         self.ai_model = genai.GenerativeModel(os.getenv('GEMINI_MODEL', 'gemini-2.0-flash'))
 
         # Trello client
-        self.trello_client = trello.TrelloClient(
+        self.trello_workflow = TrelloWorkflow(
             api_key=os.getenv('TRELLO_API_KEY'),
             api_secret=os.getenv('TRELLO_API_SECRET'),
-            token=os.getenv('TRELLO_TOKEN')
+            token=os.getenv('TRELLO_TOKEN'),
+            ai_generator=self.create_task_description
         )
 
         # Register Event Handlers
@@ -703,141 +704,73 @@ CONVERSATION:
                 user_address = self.get_user_address(user_id)
                 say(f"I'm terribly sorry, {user_address}. I couldn't summarize the conversation at this time.")
 
-        # Enhanced Trello Workflow Handlers
         @self.slack_app.message(re.compile(r"^!trello\s+(.+)"))
         def handle_trello_workflow(message: Dict[str, Any], say: Callable[[str], None]) -> None:
             user_id = message.get('user', 'unknown')
             user_address = self.get_user_address(user_id)
+            channel_id = message.get('channel', '')
             
             try:
-                # Extract command parts
+                # Extract command text
                 text = message['text'].replace('!trello', '', 1).strip()
-                parts = text.split(' ', 1)
-                command = parts[0].lower() if parts else ""
                 
-                # Get channel info to determine which board to use by default
-                channel_id = message.get('channel', '')
+                # Parse command using trello workflow module
+                command, args = self.trello_workflow.parse_command(text)
                 
                 # Handle different Trello commands
-                if command == "create" and len(parts) > 1:
-                    # Parse card title and optional list name
-                    card_info = parts[1].strip()
-                    list_name = "To Do"  # Default list
-                    board_name = "Main Board"  # Default board
+                if command == "create" and "card_title" in args:
+                    board_name = "Main Board"  # Default board, can be customized
+                    result = self.trello_workflow.create_card(
+                        board_name=board_name,
+                        list_name=args.get("list_name", "To Do"),
+                        title=args["card_title"],
+                        description=self.create_task_description(args["card_title"]) if self.create_task_description else None
+                    )
                     
-                    # Check if card info specifies a list
-                    if " in " in card_info:
-                        card_title, list_spec = card_info.split(" in ", 1)
-                        list_name = list_spec.strip()
+                    if result["success"]:
+                        say(f"I've created your Trello card, {user_address}.\n*Title:* {result['card_name']}\n*URL:* {result['card_url']}")
+                        logger.info(f"Created Trello card for user {user_id}: {result['card_name']}")
                     else:
-                        card_title = card_info
-                    
-                    # Determine board based on channel
-                    if channel_id == os.getenv('UXOPS_CHANNEL'):
-                        board_name = "Prj. UX-Ops"
-                    elif channel_id == os.getenv('AFROTAKU_CHANNEL'):
-                        board_name = "Afrotaku"
-                    
-                    # Get board and list objects
-                    boards = self.trello_client.list_boards()
-                    matching_boards = [b for b in boards if b.name.lower() == board_name.lower()]
-                    
-                    if not matching_boards:
-                        say(f"I'm afraid I couldn't find a board named '{board_name}', {user_address}.")
-                        return
-                    
-                    board = matching_boards[0]
-                    lists = board.list_lists()
-                    matching_lists = [l for l in lists if l.name.lower() == list_name.lower()]
-                    
-                    if not matching_lists:
-                        available_lists = ", ".join([f"'{l.name}'" for l in lists[:5]])
-                        say(f"I couldn't find a list named '{list_name}' on the '{board_name}' board, {user_address}. Available lists include: {available_lists}.")
-                        return
-                    
-                    selected_list = matching_lists[0]
-                    
-                    # Create AI-generated description
-                    description = self.create_task_description(card_title)
-                    
-                    # Create card
-                    new_card = selected_list.add_card(name=card_title, desc=description)
-                    
-                    say(f"I've created your Trello card in *{list_name}*, {user_address}.\n*Title:* {card_title}\n*Board:* {board.name}\n*URL:* {new_card.url}")
-                    logger.info(f"Created Trello card for user {user_id}: {card_title}")
+                        error = result["error"]
+                        say(f"I'm afraid I couldn't create the card, {user_address}: {error}")
                 
                 elif command == "boards":
-                    # List available boards
-                    boards = self.trello_client.list_boards()
-                    if boards:
-                        board_list = "\n".join([f"• *{board.name}*" for board in boards])
-                        say(f"The following Trello boards are at your disposal, {user_address}:\n\n{board_list}")
-                    else:
-                        say(f"I'm afraid I couldn't find any Trello boards, {user_address}. Would you like me to create one?")
-                
-                elif command == "lists" and len(parts) > 1:
-                    # Format: !trello lists BoardName
-                    board_name = parts[1]
-                    boards = self.trello_client.list_boards()
-                    matching_boards = [b for b in boards if b.name.lower() == board_name.lower()]
-                    
-                    if matching_boards:
-                        board = matching_boards[0]
-                        lists = board.list_lists()
-                        if lists:
-                            list_names = "\n".join([f"• *{lst.name}*" for lst in lists])
-                            say(f"For the *{board.name}* board, the following lists are available, {user_address}:\n\n{list_names}")
+                    result = self.trello_workflow.get_boards()
+                    if result["success"]:
+                        boards = result["boards"]
+                        if boards:
+                            board_list = "\n".join([f"• *{board['name']}*" for board in boards])
+                            say(f"The following Trello boards are at your disposal, {user_address}:\n\n{board_list}")
                         else:
-                            say(f"The *{board.name}* board appears to be empty, {user_address}. Would you like me to create some lists?")
+                            say(f"I'm afraid I couldn't find any Trello boards, {user_address}. Would you like me to create one?")
                     else:
-                        say(f"I couldn't find a board named *{board_name}*, {user_address}.")
+                        say(f"I encountered an issue retrieving the boards, {user_address}: {result['error']}")
                 
-                elif command == "comment" and len(parts) > 1:
-                    # Format: !trello comment [card_id] [comment_text]
-                    comment_parts = parts[1].strip().split(' ', 1)
-                    if len(comment_parts) < 2:
-                        say(f"The proper format is `!trello comment [card_id] [comment_text]`, {user_address}.")
-                        return
-                        
-                    card_id = comment_parts[0]
-                    comment_text = comment_parts[1]
-                    
-                    # Get the card
-                    try:
-                        card = self.trello_client.get_card(card_id)
-                        card.comment(comment_text)
+                elif command == "lists" and "board_name" in args:
+                    result = self.trello_workflow.get_lists(args["board_name"])
+                    if result["success"]:
+                        lists = result["lists"]
+                        if lists:
+                            list_names = "\n".join([f"• *{lst['name']}*" for lst in lists])
+                            say(f"For the *{result['board_name']}* board, the following lists are available, {user_address}:\n\n{list_names}")
+                        else:
+                            say(f"The *{result['board_name']}* board appears to be empty, {user_address}. Would you like me to create some lists?")
+                    else:
+                        say(f"I couldn't find that board, {user_address}. {result['error']}")
+                
+                elif command == "comment" and "card_id" in args and "comment_text" in args:
+                    result = self.trello_workflow.add_comment(args["card_id"], args["comment_text"])
+                    if result["success"]:
                         say(f"I've added your comment to the card, {user_address}.")
-                    except Exception as e:
-                        say(f"I'm terribly sorry, {user_address}. I couldn't add your comment: {str(e)}")
+                    else:
+                        say(f"I'm terribly sorry, {user_address}. I couldn't add your comment: {result['error']}")
                 
-                elif command == "move" and len(parts) > 1:
-                    # Format: !trello move [card_id] to [list_name]
-                    move_text = parts[1].strip()
-                    if " to " not in move_text:
-                        say(f"The proper format is `!trello move [card_id] to [list_name]`, {user_address}.")
-                        return
-                        
-                    card_id, list_name = move_text.split(" to ", 1)
-                    card_id = card_id.strip()
-                    list_name = list_name.strip()
-                    
-                    # Get the card
-                    try:
-                        card = self.trello_client.get_card(card_id)
-                        board = self.trello_client.get_board(card.board_id)
-                        lists = board.list_lists()
-                        matching_lists = [l for l in lists if l.name.lower() == list_name.lower()]
-                        
-                        if not matching_lists:
-                            available_lists = ", ".join([f"'{l.name}'" for l in lists[:5]])
-                            say(f"I couldn't find a list named '{list_name}'. Available lists include: {available_lists}.")
-                            return
-                        
-                        target_list = matching_lists[0]
-                        card.change_list(target_list.id)
-                        say(f"I've moved the card to *{list_name}*, {user_address}.")
-                    except Exception as e:
-                        say(f"I was unable to move the card, {user_address}: {str(e)}")
+                elif command == "move" and "card_id" in args and "list_name" in args:
+                    result = self.trello_workflow.move_card(args["card_id"], args["list_name"])
+                    if result["success"]:
+                        say(f"I've moved the card to *{args['list_name']}*, {user_address}.")
+                    else:
+                        say(f"I was unable to move the card, {user_address}: {result['error']}")
                 
                 else:
                     # Help message for unknown commands
