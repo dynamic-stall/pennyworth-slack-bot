@@ -5,7 +5,7 @@ Handles AI functionality using Google's Gemini API
 
 import os
 import google.generativeai as genai
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Callable, List
 import logging
 
 class AIAssistant:
@@ -130,3 +130,90 @@ class AIAssistant:
         except Exception as e:
             logging.error(f"Error generating summary: {e}")
             return f"I'm terribly sorry, {user_address}. I couldn't summarize the conversation at this time. Perhaps the topic was too complex for my humble understanding. Shall I prepare some tea while you review it yourself?"
+
+    def get_contextual_response(self, query: str, user_address: str, 
+                            thread_context: Optional[List[str]] = None, 
+                            workflow_stats: Optional[Dict[str, Any]] = None) -> str:
+        """
+        Generate a response with additional context awareness
+        
+        Args:
+            query (str): User's question or command
+            user_address (str): How to address the user
+            thread_context (List[str], optional): Messages from a thread
+            workflow_stats (Dict, optional): Statistics about workflows/deployments
+            
+        Returns:
+            str: AI-generated response
+        """
+        try:
+            # Base Alfred prompt with brevity instruction
+            alfred_prompt = f"""
+    You are Alfred Pennyworth from the Batman Arkham video game series.
+    Use a formal, dignified, and slightly sardonic tone.
+    Address the user as "{user_address}".
+    Be helpful, wise, and occasionally witty, but always respectful.
+    Include subtle references to being a butler when appropriate.
+
+    IMPORTANT: Keep responses CONCISE (50-100 words maximum).
+    Focus on answering the question directly first, then add brief characterization.
+    """
+
+            # Add thread context if provided
+            if thread_context and len(thread_context) > 0:
+                alfred_prompt += f"""
+    You're replying in a thread conversation. Here's the recent conversation:
+    {chr(10).join(thread_context[-8:])}
+
+    The user specifically asked: "{query}"
+
+    If you're being asked about information in the thread, reference it directly.
+    Always respond politely, as if joining an ongoing conversation.
+    """
+            # Add workflow statistics if provided
+            elif workflow_stats:
+                alfred_prompt += f"""
+    The user asked about workflows or deployments. Here are the actual statistics:
+    {workflow_stats['ratio_info']}
+
+    User query: {query}
+
+    Respond with the accurate statistics, formatted neatly. Don't make up numbers.
+    """
+            else:
+                alfred_prompt += f"""
+    User query: {query}
+    """
+            
+            # Generate response
+            response = self.model.generate_content(alfred_prompt)
+            return response.text
+            
+        except Exception as e:
+            logging.error(f"AI generation error: {e}")
+            return f"I'm terribly sorry, {user_address}. I encountered an error while processing your request. Perhaps we should try again when the Bat-Computer is functioning properly."
+
+    def get_time_response(self, location: str, time_str: str, user_address: str) -> str:
+        """
+        Generate a response about the time in a location
+        
+        Args:
+            location (str): The location name
+            time_str (str): The formatted time string
+            user_address (str): How to address the user
+        
+        Returns:
+            str: AI-generated response about the time
+        """
+        prompt = f"""
+    You are Alfred Pennyworth from Batman.
+    The time in {location} is currently {time_str}.
+    Create a very brief, butler-like response telling {user_address} the time.
+    Keep it under 25 words, formal but slightly witty.
+    """
+        try:
+            response = self.model.generate_content(prompt)
+            return response.text.strip()
+        except Exception as e:
+            logging.error(f"Error generating time response: {e}")
+            return f"The time in {location} is currently {time_str}, {user_address}."

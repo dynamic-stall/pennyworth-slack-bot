@@ -12,6 +12,7 @@ from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 import google.generativeai as genai
 from dotenv import load_dotenv
+from src.ai_assistant import AIAssistant
 from src.trello_workflows import TrelloWorkflow
 from typing import Optional, Dict, Any, Callable, List
 
@@ -37,7 +38,7 @@ class PennyworthBot:
         )
 
         # Gemini AI model - use environment variable with default fallback
-        self.ai_model = genai.GenerativeModel(os.getenv('GEMINI_MODEL', 'gemini-2.0-flash'))
+        self.ai_assistant = AIAssistant(os.getenv('GOOGLE_GEMINI_API_KEY'))
 
         # Trello client
         self.trello_workflow = TrelloWorkflow(
@@ -260,20 +261,8 @@ class PennyworthBot:
                 logger.error(f"Failed to send Afrotaku welcome: {e}")
 
     def create_task_description(self, task_title):
-        """Generate an AI-powered task description in Alfred's style"""
         try:
-            description_prompt = f"""
-Create a concise task description (max 100 words) for: {task_title}
-Include:
-- What needs to be done
-- Potential first steps
-- Key considerations
-
-Write in the style of Alfred Pennyworth from the Batman Arkham video game series:
-formal, dignified, and slightly sardonic.
-"""
-            response = self.ai_model.generate_content(description_prompt)
-            return response.text.strip()
+            return self.ai_assistant.create_task_description(task_title)
         except Exception as e:
             logger.error(f"Error generating task description: {e}")
             return f"Task: {task_title}"
@@ -343,13 +332,13 @@ formal, dignified, and slightly sardonic.
                 if time_match:
                     location = time_match.group(1).strip()
                     time_str = self.get_time_for_location(location)
-                    response_text = f"The time in {location} is currently {time_str}, {user_address}."
+                    response = self.ai_assistant.get_time_response(location, time_str, user_address)
                     
                     # If in thread, reply to thread
                     if is_in_thread:
-                        say(text=response_text, thread_ts=thread_ts)
+                        say(text=response, thread_ts=thread_ts)
                     else:
-                        say(response_text)
+                        say(response)
                     return
                 
                 # Check for workflow/deployment statistics
@@ -383,34 +372,17 @@ formal, dignified, and slightly sardonic.
         - Failed deployments: {failure_count} ({int((failure_count/total)*100)}%)
         - Success ratio: {success_count}:{failure_count}
         """
-                            
-                            # Enhanced Alfred prompt with deployment statistics
-                            alfred_prompt = f"""
-        You are Alfred Pennyworth from the Batman Arkham video game series.
-        Use a formal, dignified, and slightly sardonic tone.
-        Address the user as "{user_address}".
-        Be helpful, wise, and occasionally witty, but always respectful.
-        Include subtle references to being a butler, as well as Batman comic book references, when appropriate.
-
-        IMPORTANT: Keep responses CONCISE (50-100 words maximum).
-
-        The user asked about workflows or deployments. Here are the actual statistics:
-        {ratio_info}
-
-        User query: {message_text}
-
-        Respond with the accurate statistics, formatted neatly. Don't make up numbers.
-        """
-                            
+                                                       
                             # Generate AI response with stats context
                             logger.info(f"Generating deployment statistics response for user {user_id}")
-                            response = self.ai_model.generate_content(alfred_prompt)
-                            
+                            stats = {'ratio_info': ratio_info}
+                            response = self.ai_assistant.get_contextual_response(message_text, user_address, workflow_stats=stats)
+
                             # If in thread, reply to thread
                             if is_in_thread:
-                                say(text=response.text, thread_ts=thread_ts)
+                                say(text=response, thread_ts=thread_ts)
                             else:
-                                say(response.text)
+                                say(response)
                             return
                     except Exception as e:
                         logger.error(f"Error processing deployment statistics: {e}")
@@ -433,59 +405,28 @@ formal, dignified, and slightly sardonic.
                                 user_id = msg.get('user', 'unknown')
                                 thread_messages.append(f"<@{user_id}>: {msg['text']}")
                                 participants.add(user_id)
-                        
-                        # Thread-aware prompt with conversation context
-                        alfred_prompt = f"""
-        You are Alfred Pennyworth from the Batman Arkham video game series.
-        Use a formal, dignified, and slightly sardonic tone.
-        Address the user as "{user_address}".
-        Be helpful, wise, and occasionally witty, but always respectful.
-        Include subtle references to being a butler, as well as Batman comic book references, when appropriate.
-
-        IMPORTANT: Keep responses CONCISE (50-100 words maximum).
-        Focus on answering the question directly first, then add brief characterization.
-
-        You're replying in a thread conversation. Here's the recent conversation:
-        {chr(10).join(thread_messages[-8:])}
-
-        The user specifically asked: "{message_text}"
-
-        If you're being asked about information in the thread, reference it directly.
-        Always respond politely, as if joining an ongoing conversation.
-        """
-                        
+                                                
                         logger.info(f"Generating thread-aware response for user {user_id}")
-                        response = self.ai_model.generate_content(alfred_prompt)
+                        response = self.ai_assistant.get_contextual_response(
+                            query=message_text,
+                            user_address=user_address,
+                            thread_context=thread_messages
+                        )
                         
-                        say(text=response.text, thread_ts=thread_ts)
+                        say(text=response, thread_ts=thread_ts)
                         return
                     except Exception as e:
                         logger.error(f"Error processing thread context: {e}")
-                        # Fall back to standard processing if thread context fails
                 
-                # Standard Alfred prompt for non-thread mentions
-                alfred_prompt = f"""
-        You are Alfred Pennyworth from the Batman Arkham video game series.
-        Use a formal, dignified, and slightly sardonic tone.
-        Address the user as "{user_address}".
-        Be helpful, wise, and occasionally witty, but always respectful.
-        Include subtle references to being a butler when appropriate.
-
-        IMPORTANT: Keep responses CONCISE and to the point (50-100 words maximum).
-        Focus on answering the question directly first, then add brief characterization.
-
-        User query: {message_text}
-        """
+                # Standard response with no special context
+                response = self.ai_assistant.get_contextual_response(message_text, user_address)
                 
-                logger.info(f"Generating AI response for mention from user {user_id}")
-                response = self.ai_model.generate_content(alfred_prompt)
-                
-                # If in thread, reply to thread (as fallback)
+                # If in thread, reply to thread
                 if is_in_thread:
-                    say(text=response.text, thread_ts=thread_ts)
+                    say(text=response, thread_ts=thread_ts)
                 else:
-                    say(response.text)
-                
+                    say(response)
+            
             except Exception as e:
                 logger.error(f"Error handling app mention: {str(e)}")
                 say(f"I do apologize, but I'm experiencing some technical difficulties. Error details: {str(e)}")
@@ -570,24 +511,15 @@ formal, dignified, and slightly sardonic.
                 if time_match:
                     location = time_match.group(1).strip()
                     time_str = self.get_time_for_location(location)
-                    say(f"The time in {location} is currently {time_str}, {user_address}.")
+                    user_address = self.get_user_address(user_id)
+                    response = self.ai_assistant.get_time_response(location, time_str, user_address)
+                    say(response)
                     return
 
                 # Get user info for context
                 user_info = self.slack_app.client.users_info(user=user_id).get('user', {})
                 user_address = self.get_user_address(user_id)
-                
-                # Create Alfred-style prompt
-                alfred_prompt = f"""
-You are Alfred Pennyworth from the Batman Arkham video game series.
-Use a formal, dignified, and slightly sardonic tone.
-Address the user as "{user_address}".
-Be helpful, wise, and occasionally witty, but always respectful.
-Include subtle references to being a butler, as well as Batman comic book references, when appropriate.
-
-User query: {query}
-"""
-                
+                                
                 # Check for workflow/deployment statistics
                 if "workflow" in query.lower() or "deployment" in query.lower() or "ratio" in query.lower() or "success" in query.lower():
                     try:
@@ -615,44 +547,27 @@ User query: {query}
                         total = success_count + failure_count
                         if total > 0:
                             ratio_info = f"""
-    Based on the last {total} deployment messages in this channel:
-    - Successful deployments: {success_count} ({int((success_count/total)*100)}%)  
-    - Failed deployments: {failure_count} ({int((failure_count/total)*100)}%)
-    - Success ratio: {success_count}:{failure_count}
-    """
+        Based on the last {total} deployment messages in this channel:
+        - Successful deployments: {success_count} ({int((success_count/total)*100)}%)  
+        - Failed deployments: {failure_count} ({int((failure_count/total)*100)}%)
+        - Success ratio: {success_count}:{failure_count}
+        """
                             
-                            # Enhanced Alfred prompt with deployment statistics
-                            alfred_prompt = f"""
-    You are Alfred Pennyworth from the Batman Arkham video game series.
-    Use a formal, dignified, and slightly sardonic tone.
-    Address the user as "{user_address}".
-    Be helpful, wise, and occasionally witty, but always respectful.
-    Include subtle references to being a butler, as well as Batman comic book references, when appropriate.
-
-    IMPORTANT: Keep responses CONCISE (50-100 words maximum).
-
-    The user asked about workflows or deployments. Here are the actual statistics:
-    {ratio_info}
-
-    User query: {query}
-
-    Respond with the accurate statistics, formatted neatly. Don't make up numbers.
-    """
+                            # Use AI assistant with workflow stats
+                            user_address = self.get_user_address(user_id)
+                            stats = {'ratio_info': ratio_info}
+                            response = self.ai_assistant.get_contextual_response(query, user_address, workflow_stats=stats)
                             
-                            # Generate AI response with stats context
-                            logger.info(f"Generating deployment statistics response for user {user_id}")
-                            response = self.ai_model.generate_content(alfred_prompt)
-                            
-                            say(response.text)
+                            say(response)
                             return
                     except Exception as e:
                         logger.error(f"Error processing deployment statistics: {e}")
 
-                # Generate AI response
-                logger.info(f"Generating AI response for user {user_id}")
-                response = self.ai_model.generate_content(alfred_prompt)
+                # Standard response
+                user_address = self.get_user_address(user_id)
+                response = self.ai_assistant.get_contextual_response(query, user_address)
+                say(response)
                 
-                say(response.text)
             except Exception as e:
                 logger.error(f"AI assistant error: {str(e)}")
                 error_message = self._get_alfred_style_response(user_id, "error")
@@ -690,12 +605,16 @@ Keep the summary concise (no more than 150 words) but comprehensive, capturing t
 CONVERSATION:
 {" ".join(messages[:20])}
 """
-                
+
+                context = {
+                    'channel_name': channel_name,
+                    'messages': " ".join(messages[:20]),
+                    'user': message.get('user')
+                }
+
                 # Generate summary
                 logger.info(f"Generating conversation summary for channel {channel_id}")
-                response = self.ai_model.generate_content(summary_prompt)
-                summary = response.text.strip()
-                
+                summary = self.ai_assistant.summarize_conversation(context)
                 say(f"*Summary of recent conversation in #{channel_name}*\n\n{summary}")
             
             except Exception as e:
