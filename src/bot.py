@@ -13,7 +13,7 @@ from slack_bolt.adapter.socket_mode import SocketModeHandler
 import google.generativeai as genai
 from dotenv import load_dotenv
 import trello
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Callable, List
 
 # Configure logging
 logging.basicConfig(
@@ -307,17 +307,18 @@ formal, dignified, and slightly sardonic.
             response = responses[random.randint(0, len(responses) - 1)]
             say(response)
 
-        # Add this handler to the _register_handlers method
         @self.slack_app.event("app_mention")
         def handle_app_mentions(body, say):
             try:
                 user_id = body["event"].get("user")
                 text = body["event"].get("text", "")
-                
+                channel = body["event"].get("channel", "")
+                thread_ts = body["event"].get("thread_ts")
+                is_in_thread = "thread_ts" in body["event"]
+                message_ts = body["event"].get("ts")
+
                 # Extract the actual message content (remove the app mention part)
-                # Format is typically <@BOT_USER_ID> followed by the message
                 message_text = re.sub(r"<@[A-Z0-9]+>\s*", "", text).strip()
-                
                 user_address = self.get_user_address(user_id)
                 
                 # If it's just a mention with no text, provide a helpful response
@@ -327,26 +328,162 @@ formal, dignified, and slightly sardonic.
                         f"At your service, {user_address}. How might I help?",
                         f"{user_address}, I'm attending. What do you require?"
                     ]
-                    say(random.choice(responses))
+                    # If in thread, reply to thread
+                    if is_in_thread:
+                        say(text=random.choice(responses), thread_ts=thread_ts)
+                    else:
+                        say(random.choice(responses))
                     return
                 
-                # Otherwise, process as an AI query similar to !ai command
-                alfred_prompt = f"""
-Respond as Alfred Pennyworth from the Batman Arkham video game series. 
-Use a formal, dignified, and slightly sardonic tone.
-Address the user as "{user_address}".
-Be helpful, wise, and occasionally witty, but always respectful.
-Include subtle references to being a butler, as well as Batman comic book references, when appropriate.
-IMPORTANT: Keep responses CONCISE and to the point (100 words maximum).
-Focus on answering the question directly first, then add brief characterization.
+                # Check for time-related queries
+                time_pattern = re.compile(r"what(?:'s| is) (?:the )?time(?: in | at )([a-zA-Z\s]+)\??")
+                time_match = time_pattern.search(message_text.lower())
+                
+                if time_match:
+                    location = time_match.group(1).strip()
+                    time_str = self.get_time_for_location(location)
+                    response_text = f"The time in {location} is currently {time_str}, {user_address}."
+                    
+                    # If in thread, reply to thread
+                    if is_in_thread:
+                        say(text=response_text, thread_ts=thread_ts)
+                    else:
+                        say(response_text)
+                    return
+                
+                # Check for workflow/deployment statistics
+                if "workflow" in message_text.lower() or "deployment" in message_text.lower() or "ratio" in message_text.lower() or "success" in message_text.lower():
+                    try:
+                        # Get channel history
+                        history = self.slack_app.client.conversations_history(
+                            channel=channel,
+                            limit=50  # Last 50 messages
+                        )
+                        
+                        # Extract deployment status messages
+                        deployment_messages = []
+                        success_count = 0
+                        failure_count = 0
+                        
+                        for msg in history.get("messages", []):
+                            text = msg.get("text", "")
+                            if "Workflow" in text and ("success" in text.lower() or "failed" in text.lower() or "failure" in text.lower()):
+                                deployment_messages.append(text)
+                                if "success" in text.lower():
+                                    success_count += 1
+                                elif "failed" in text.lower() or "failure" in text.lower():
+                                    failure_count += 1
+                        
+                        total = success_count + failure_count
+                        if total > 0:
+                            ratio_info = f"""
+        Based on the last {total} deployment messages in this channel:
+        - Successful deployments: {success_count} ({int((success_count/total)*100)}%)  
+        - Failed deployments: {failure_count} ({int((failure_count/total)*100)}%)
+        - Success ratio: {success_count}:{failure_count}
+        """
+                            
+                            # Enhanced Alfred prompt with deployment statistics
+                            alfred_prompt = f"""
+        You are Alfred Pennyworth from the Batman Arkham video game series.
+        Use a formal, dignified, and slightly sardonic tone.
+        Address the user as "{user_address}".
+        Be helpful, wise, and occasionally witty, but always respectful.
+        Include subtle references to being a butler when appropriate.
 
-User query: {message_text}
-"""
+        IMPORTANT: Keep responses CONCISE (50-100 words maximum).
+
+        The user asked about workflows or deployments. Here are the actual statistics:
+        {ratio_info}
+
+        User query: {message_text}
+
+        Respond with the accurate statistics, formatted neatly. Don't make up numbers.
+        """
+                            
+                            # Generate AI response with stats context
+                            logger.info(f"Generating deployment statistics response for user {user_id}")
+                            response = self.ai_model.generate_content(alfred_prompt)
+                            
+                            # If in thread, reply to thread
+                            if is_in_thread:
+                                say(text=response.text, thread_ts=thread_ts)
+                            else:
+                                say(response.text)
+                            return
+                    except Exception as e:
+                        logger.error(f"Error processing deployment statistics: {e}")
+                
+                # Thread awareness - get thread context if in a thread
+                if is_in_thread:
+                    try:
+                        thread_history = self.slack_app.client.conversations_replies(
+                            channel=channel,
+                            ts=thread_ts,
+                            limit=10
+                        )
+                        
+                        # Extract thread messages and participants
+                        thread_messages = []
+                        participants = set()
+                        
+                        for msg in thread_history.get("messages", []):
+                            if "text" in msg and msg["ts"] != message_ts:  # Skip the current message
+                                user_id = msg.get('user', 'unknown')
+                                thread_messages.append(f"<@{user_id}>: {msg['text']}")
+                                participants.add(user_id)
+                        
+                        # Thread-aware prompt with conversation context
+                        alfred_prompt = f"""
+        You are Alfred Pennyworth from the Batman Arkham video game series.
+        Use a formal, dignified, and slightly sardonic tone.
+        Address the user as "{user_address}".
+        Be helpful, wise, and occasionally witty, but always respectful.
+        Include subtle references to being a butler when appropriate.
+
+        IMPORTANT: Keep responses CONCISE (50-100 words maximum).
+        Focus on answering the question directly first, then add brief characterization.
+
+        You're replying in a thread conversation. Here's the recent conversation:
+        {chr(10).join(thread_messages[-8:])}
+
+        The user specifically asked: "{message_text}"
+
+        If you're being asked about information in the thread, reference it directly.
+        Always respond politely, as if joining an ongoing conversation.
+        """
+                        
+                        logger.info(f"Generating thread-aware response for user {user_id}")
+                        response = self.ai_model.generate_content(alfred_prompt)
+                        
+                        say(text=response.text, thread_ts=thread_ts)
+                        return
+                    except Exception as e:
+                        logger.error(f"Error processing thread context: {e}")
+                        # Fall back to standard processing if thread context fails
+                
+                # Standard Alfred prompt for non-thread mentions
+                alfred_prompt = f"""
+        You are Alfred Pennyworth from the Batman Arkham video game series.
+        Use a formal, dignified, and slightly sardonic tone.
+        Address the user as "{user_address}".
+        Be helpful, wise, and occasionally witty, but always respectful.
+        Include subtle references to being a butler when appropriate.
+
+        IMPORTANT: Keep responses CONCISE and to the point (50-100 words maximum).
+        Focus on answering the question directly first, then add brief characterization.
+
+        User query: {message_text}
+        """
                 
                 logger.info(f"Generating AI response for mention from user {user_id}")
                 response = self.ai_model.generate_content(alfred_prompt)
                 
-                say(response.text)
+                # If in thread, reply to thread (as fallback)
+                if is_in_thread:
+                    say(text=response.text, thread_ts=thread_ts)
+                else:
+                    say(response.text)
                 
             except Exception as e:
                 logger.error(f"Error handling app mention: {str(e)}")
@@ -424,7 +561,17 @@ User query: {message_text}
                     user_address = self.get_user_address(user_id)
                     say(f"How may I assist you, {user_address}? Please provide a query after the !ai command.")
                     return
-                
+
+                # Check for time-related queries
+                time_pattern = re.compile(r"what(?:'s| is) (?:the )?time(?: in | at )([a-zA-Z\s]+)\??")
+                time_match = time_pattern.search(query.lower())
+
+                if time_match:
+                    location = time_match.group(1).strip()
+                    time_str = self.get_time_for_location(location)
+                    say(f"The time in {location} is currently {time_str}, {user_address}.")
+                    return
+
                 # Get user info for context
                 user_info = self.slack_app.client.users_info(user=user_id).get('user', {})
                 user_address = self.get_user_address(user_id)
@@ -440,6 +587,66 @@ Include subtle references to being a butler when appropriate.
 User query: {query}
 """
                 
+                # Check for workflow/deployment statistics
+                if "workflow" in query.lower() or "deployment" in query.lower() or "ratio" in query.lower() or "success" in query.lower():
+                    try:
+                        channel_id = message.get('channel')
+                        # Get channel history
+                        history = self.slack_app.client.conversations_history(
+                            channel=channel_id,
+                            limit=50  # Last 50 messages
+                        )
+                        
+                        # Extract deployment status messages
+                        deployment_messages = []
+                        success_count = 0
+                        failure_count = 0
+                        
+                        for msg in history.get("messages", []):
+                            text = msg.get("text", "")
+                            if "Workflow" in text and ("success" in text.lower() or "failed" in text.lower() or "failure" in text.lower()):
+                                deployment_messages.append(text)
+                                if "success" in text.lower():
+                                    success_count += 1
+                                elif "failed" in text.lower() or "failure" in text.lower():
+                                    failure_count += 1
+                        
+                        total = success_count + failure_count
+                        if total > 0:
+                            ratio_info = f"""
+    Based on the last {total} deployment messages in this channel:
+    - Successful deployments: {success_count} ({int((success_count/total)*100)}%)  
+    - Failed deployments: {failure_count} ({int((failure_count/total)*100)}%)
+    - Success ratio: {success_count}:{failure_count}
+    """
+                            
+                            # Enhanced Alfred prompt with deployment statistics
+                            alfred_prompt = f"""
+    You are Alfred Pennyworth from the Batman Arkham video game series.
+    Use a formal, dignified, and slightly sardonic tone.
+    Address the user as "{user_address}".
+    Be helpful, wise, and occasionally witty, but always respectful.
+    Include subtle references to being a butler when appropriate.
+
+    IMPORTANT: Keep responses CONCISE (50-100 words maximum).
+
+    The user asked about workflows or deployments. Here are the actual statistics:
+    {ratio_info}
+
+    User query: {query}
+
+    Respond with the accurate statistics, formatted neatly. Don't make up numbers.
+    """
+                            
+                            # Generate AI response with stats context
+                            logger.info(f"Generating deployment statistics response for user {user_id}")
+                            response = self.ai_model.generate_content(alfred_prompt)
+                            
+                            say(response.text)
+                            return
+                    except Exception as e:
+                        logger.error(f"Error processing deployment statistics: {e}")
+
                 # Generate AI response
                 logger.info(f"Generating AI response for user {user_id}")
                 response = self.ai_model.generate_content(alfred_prompt)
