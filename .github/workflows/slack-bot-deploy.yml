@@ -2,7 +2,8 @@ name: Deploy Pennyworth AI Slack Bot
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
@@ -19,6 +20,13 @@ jobs:
       - name: Capture start time
         id: start-time
         run: echo "start_time=$(date +%s)" >> $GITHUB_OUTPUT
+
+      - name: Extract app version from code
+        id: extract_version
+        run: |
+            echo "version=$(python -c "import re; print(re.search(r\"__version__ = '(.*?)'|version = '(.*?)'\", \
+                open('src/__init__.py').read()).group(1) or re.search(r\"__version__ = '(.*?)'|version = '(.*?)'\", \
+                open('src/__init__.py').read()).group(2))")" >> $GITHUB_OUTPUT
 
       - name: Get Secrets from Bitwarden
         id: bws
@@ -84,7 +92,6 @@ jobs:
             ADMIN_CHANNEL=C0123456789
             EOL
             
-      # Auth with GCP for Cloud Run only - no container registry
       - name: Setup gcloud CLI
         uses: google-github-actions/setup-gcloud@v1
         with:
@@ -97,7 +104,6 @@ jobs:
             gcloud auth activate-service-account --key-file=/tmp/gcp-key.json --project=${{ steps.bws.outputs.GCP_PROJECT_ID }}
             rm /tmp/gcp-key.json
 
-      # GitHub Container Registry Login & Publish
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v2
         with:
@@ -110,11 +116,10 @@ jobs:
           # Create Dockerfile if it doesn't exist
           if [ ! -f Dockerfile ]; then
               cat > Dockerfile <<EOL
-          FROM python:3.10-slim
+          FROM python:${{ vars.PYTHON_VERSION }}-slim
           
           WORKDIR /app
           
-          # Install required packages
           RUN apt-get update && apt-get install -y --no-install-recommends \\
             curl \\
             && rm -rf /var/lib/apt/lists/*
@@ -122,27 +127,33 @@ jobs:
           COPY requirements.txt .
           RUN pip install --no-cache-dir -r requirements.txt
           
-          # Copy application code
           COPY . .
           
-          # Check contents for debugging
           RUN ls -la
 
           EXPOSE 8080
 
-          # Set environment variables
           ENV PYTHONUNBUFFERED=1
 
-          # Debug Python version
           RUN python --version
           
           CMD ["python", "server.py"]
           EOL
           fi
           
-          # Build and push to GitHub Container Registry
-          docker build -t ghcr.io/${{ github.repository_owner }}/pennyworth-bot:${{ github.sha }} .
-          docker push ghcr.io/${{ github.repository_owner }}/pennyworth-bot:${{ github.sha }}
+          # Get extracted version
+          VERSION="${{ steps.extract_version.outputs.version }}"
+
+          # Build and tag with both SHA and version
+          docker build -t ghcr.io/${{ github.repository_owner }}/pennyworth-bot:latest .
+          docker tag ghcr.io/${{ github.repository_owner }}/pennyworth-bot:latest ghcr.io/${{ github.repository_owner }}/pennyworth-bot:v${VERSION}
+
+          # Push both tags
+          docker push ghcr.io/${{ github.repository_owner }}/pennyworth-bot:latest
+          docker push ghcr.io/${{ github.repository_owner }}/pennyworth-bot:v${VERSION}
+
+          # Save version for later steps
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
 
       - name: Configure Docker for GCR
         run: |
@@ -150,15 +161,18 @@ jobs:
 
       - name: Copy image to Google Container Registry
         run: |
-          # Pull the GitHub image we just pushed
-          docker pull ghcr.io/${{ github.repository_owner }}/pennyworth-bot:${{ github.sha }}
+          # Pull the GitHub image
+          docker pull ghcr.io/${{ github.repository_owner }}/pennyworth-bot:latest
 
           # Tag it for Google Container Registry
-          docker tag ghcr.io/${{ github.repository_owner }}/pennyworth-bot:${{ github.sha }} \
-            gcr.io/${{ steps.bws.outputs.GCP_PROJECT_ID }}/pennyworth-bot:${{ github.sha }}
+          docker tag ghcr.io/${{ github.repository_owner }}/pennyworth-bot:latest \
+            gcr.io/${{ steps.bws.outputs.GCP_PROJECT_ID }}/pennyworth-bot:latest
+          docker tag ghcr.io/${{ github.repository_owner }}/pennyworth-bot:latest \
+            gcr.io/${{ steps.bws.outputs.GCP_PROJECT_ID }}/pennyworth-bot:v${VERSION}
 
-          # Push to Google Container Registry
-          docker push gcr.io/${{ steps.bws.outputs.GCP_PROJECT_ID }}/pennyworth-bot:${{ github.sha }}
+          # Push tags to GCR
+          docker push gcr.io/${{ steps.bws.outputs.GCP_PROJECT_ID }}/pennyworth-bot:latest
+          docker push gcr.io/${{ steps.bws.outputs.GCP_PROJECT_ID }}/pennyworth-bot:v${VERSION}
 
       - name: Deploy to Cloud Run
         run: |
