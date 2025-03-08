@@ -1,6 +1,19 @@
 # CHANGELOG
 
 
+## v1.1.0 (2025-03-07)
+
+### Chores
+
+- Add semantic release workflow and config file
+  ([`6b4d340`](https://github.com/tflagship/pennyworth-slack-bot/commit/6b4d340e652859339f3aae873c61fafe07f48cac))
+
+### Features
+
+- Add @mentions feature + debug socket mode
+  ([`fea019e`](https://github.com/tflagship/pennyworth-slack-bot/commit/fea019eabf68f76c4883cbe3ae74423b68907738))
+
+
 ## v1.0.0 (2025-03-07)
 
 ### Bug Fixes
