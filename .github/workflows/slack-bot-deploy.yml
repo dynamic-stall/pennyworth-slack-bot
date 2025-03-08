@@ -113,34 +113,6 @@ jobs:
 
       - name: Build and push Docker image
         run: |
-          # Create Dockerfile if it doesn't exist
-          if [ ! -f Dockerfile ]; then
-              cat > Dockerfile <<EOL
-          FROM python:${{ vars.PYTHON_VERSION }}-slim
-          
-          WORKDIR /app
-          
-          RUN apt-get update && apt-get install -y --no-install-recommends \\
-            curl \\
-            && rm -rf /var/lib/apt/lists/*
-
-          COPY requirements.txt .
-          RUN pip install --no-cache-dir -r requirements.txt
-          
-          COPY . .
-          
-          RUN ls -la
-
-          EXPOSE 8080
-
-          ENV PYTHONUNBUFFERED=1
-
-          RUN python --version
-          
-          CMD ["python", "server.py"]
-          EOL
-          fi
-          
           # Get extracted version
           VERSION="${{ steps.extract_version.outputs.version }}"
 
