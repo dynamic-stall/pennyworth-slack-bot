@@ -152,6 +152,56 @@ class PennyworthBot:
         category_responses = responses.get(category, responses["general"])
         return random.choice(category_responses)
 
+    def get_time_for_location(self, location):
+        """Get current time for a given location using timezone database"""
+        try:
+            location = location.lower().strip()
+            
+            # Map common city/region names to timezone strings
+            common_locations = {
+                'new york': 'America/New_York',
+                'nyc': 'America/New_York',
+                'chicago': 'America/Chicago', 
+                'la': 'America/Los_Angeles',
+                'alaska': 'America/Anchorage',
+                'hawaii': 'Pacific/Honolulu',
+                'london': 'Europe/London',
+                'uk': 'Europe/London',
+                'france': 'Europe/Paris',
+                'germany': 'Europe/Berlin',
+                'italy': 'Europe/Rome',
+                'turkey': 'Europe/Istanbul',
+                'japan': 'Asia/Tokyo',
+                'tokyo': 'Asia/Tokyo',
+                'korea': 'Asia/Seoul',
+                'china': 'Asia/Shanghai',
+                'india': 'Asia/Kolkata',
+                'sydney': 'Australia/Sydney',
+                'pacific': 'America/Los_Angeles',
+                'eastern': 'America/New_York',
+                'central': 'America/Chicago',
+                'mountain': 'America/Denver'
+            }
+            
+            # Try direct mapping first
+            if location in common_locations:
+                timezone = pytz.timezone(common_locations[location])
+                current_time = datetime.datetime.now(timezone)
+                return current_time.strftime("%I:%M %p on %A, %B %d")
+                
+            # Try partial matching for country/region
+            for tz in pytz.common_timezones:
+                if location in tz.lower():
+                    timezone = pytz.timezone(tz)
+                    current_time = datetime.datetime.now(timezone)
+                    return current_time.strftime("%I:%M %p on %A, %B %d")
+            
+            return f"I'm afraid I don't have timezone information for '{location}'."
+            
+        except Exception as e:
+            logger.error(f"Error getting time for location {location}: {e}")
+            return f"I couldn't determine the time for {location}."
+
     def send_project_welcome_messages(self, user_id):
         """Send welcome messages to project channels for new users"""
         user_address = self.get_user_address(user_id)
