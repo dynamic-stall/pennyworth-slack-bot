@@ -280,7 +280,7 @@ formal, dignified, and slightly sardonic.
     def _register_handlers(self):
         # Enhanced greeting
         @self.slack_app.message("hello")
-        def say_hello(message, say):
+        def say_hello(message: Dict[str, Any], say: Callable[[str], None]) -> None:
             user_id = message.get('user')
             greeting = self._get_time_greeting()
             user_address = self.get_user_address(user_id)
@@ -308,7 +308,7 @@ formal, dignified, and slightly sardonic.
             say(response)
 
         @self.slack_app.event("app_mention")
-        def handle_app_mentions(body, say):
+        def handle_app_mentions(body: Dict[str, Any], say: Callable[[str, Optional[Dict[str, Any]]], None]) -> None:
             try:
                 user_id = body["event"].get("user")
                 text = body["event"].get("text", "")
@@ -491,7 +491,7 @@ formal, dignified, and slightly sardonic.
 
         # New User Join Notification with improved Alfred tone
         @self.slack_app.event("team_join")
-        def welcome_new_user(event, say):
+        def welcome_new_user(event: Dict[str, Any], say: Callable[[str], None]) -> None:
             try:
                 user = event["user"]
                 user_address = self.get_user_address(user['id'])
@@ -550,7 +550,7 @@ formal, dignified, and slightly sardonic.
 
         # AI Assistant Interaction with Alfred personality - Using properly personalized addressing
         @self.slack_app.message(re.compile(r"^!ai\s+(.+)"))
-        def ai_assistant(message, say):
+        def ai_assistant(message: Dict[str, Any], say: Callable[[str], None]) -> None:
             user_id = message.get('user', 'unknown')
             try:
                 # Extract user query using regex
@@ -659,7 +659,7 @@ User query: {query}
 
         # Summarize conversation feature
         @self.slack_app.message(re.compile(r"^!summarize"))
-        def summarize_conversation(message, say):
+        def summarize_conversation(message: Dict[str, Any], say: Callable[[str], None]) -> None:
             try:
                 channel_id = message['channel']
                 user_id = message.get('user')
@@ -705,7 +705,7 @@ CONVERSATION:
 
         # Enhanced Trello Workflow Handlers
         @self.slack_app.message(re.compile(r"^!trello\s+(.+)"))
-        def handle_trello_workflow(message, say):
+        def handle_trello_workflow(message: Dict[str, Any], say: Callable[[str], None]) -> None:
             user_id = message.get('user', 'unknown')
             user_address = self.get_user_address(user_id)
             
