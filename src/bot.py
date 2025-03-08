@@ -8,7 +8,7 @@ import random
 import datetime
 import pytz
 import re
-import slack_bolt
+from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 import google.generativeai as genai
 from dotenv import load_dotenv
@@ -30,16 +30,16 @@ genai.configure(api_key=os.getenv('GOOGLE_GEMINI_API_KEY'))
 
 class PennyworthBot:
     def __init__(self):
-        # Slack Bot Initialization
-        self.slack_app = slack_bolt.App(
+        # Slack Bot initialization
+        self.slack_app = App(
             token=os.getenv('SLACK_BOT_TOKEN'),
             signing_secret=os.getenv('SLACK_SIGNING_SECRET')
         )
 
-        # Gemini AI Model - Use environment variable with default fallback
+        # Gemini AI model - use environment variable with default fallback
         self.ai_model = genai.GenerativeModel(os.getenv('GEMINI_MODEL', 'gemini-2.0-flash'))
 
-        # Trello Client
+        # Trello client
         self.trello_client = trello.TrelloClient(
             api_key=os.getenv('TRELLO_API_KEY'),
             api_secret=os.getenv('TRELLO_API_SECRET'),
@@ -256,6 +256,49 @@ formal, dignified, and slightly sardonic.
             # Randomize response
             response = responses[random.randint(0, len(responses) - 1)]
             say(response)
+
+        # Add this handler to the _register_handlers method
+        @self.slack_app.event("app_mention")
+        def handle_app_mentions(body, say):
+            try:
+                user_id = body["event"].get("user")
+                text = body["event"].get("text", "")
+                
+                # Extract the actual message content (remove the app mention part)
+                # Format is typically <@BOT_USER_ID> followed by the message
+                message_text = re.sub(r"<@[A-Z0-9]+>\s*", "", text).strip()
+                
+                user_address = self.get_user_address(user_id)
+                
+                # If it's just a mention with no text, provide a helpful response
+                if not message_text:
+                    responses = [
+                        f"You rang, {user_address}? How may I be of assistance?",
+                        f"At your service, {user_address}. How might I help?",
+                        f"{user_address}, I'm attending. What do you require?"
+                    ]
+                    say(random.choice(responses))
+                    return
+                
+                # Otherwise, process as an AI query similar to !ai command
+                alfred_prompt = f"""
+You are Alfred Pennyworth from the Batman Arkham video game series.
+Use a formal, dignified, and slightly sardonic tone.
+Address the user as "{user_address}".
+Be helpful, wise, and occasionally witty, but always respectful.
+Include subtle references to being a butler when appropriate.
+
+User query: {message_text}
+"""
+                
+                logger.info(f"Generating AI response for mention from user {user_id}")
+                response = self.ai_model.generate_content(alfred_prompt)
+                
+                say(response.text)
+                
+            except Exception as e:
+                logger.error(f"Error handling app mention: {str(e)}")
+                say(f"I do apologize, but I'm experiencing some technical difficulties. Error details: {str(e)}")
 
         # New User Join Notification with improved Alfred tone
         @self.slack_app.event("team_join")
@@ -555,12 +598,12 @@ CONVERSATION:
                 say(f"{error_message} The Trello system appears to be offline: {str(e)}")
 
     def start(self):
-        # Start the Slack bot
         try:
             logger.info("Starting Pennyworth Bot in Socket Mode")
+                        
             handler = SocketModeHandler(
                 self.slack_app, 
-                os.getenv('SLACK_APP_TOKEN')
+                os.getenv('SLACK_APP_TOKEN'),
             )
             handler.start()
         except Exception as e:
