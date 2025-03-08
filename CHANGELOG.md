@@ -1,6 +1,56 @@
 # CHANGELOG
 
 
+## v1.2.0 (2025-03-08)
+
+### Bug Fixes
+
+- Improve Alfred-style prompts with increased brevity
+  ([`fbe74c8`](https://github.com/tflagship/pennyworth-slack-bot/commit/fbe74c8523c71070be4f1ef3d098c112f9f20de1))
+
+### Build System
+
+- Create dockerfile locally
+  ([`e7b6563`](https://github.com/tflagship/pennyworth-slack-bot/commit/e7b656351be75a1a19b774a19176a19fa6010c99))
+
+### Chores
+
+- Add improved type annotations to handler methods
+  ([`560cd2d`](https://github.com/tflagship/pennyworth-slack-bot/commit/560cd2dbc26286e3e750af955bb47c7e5738eb15))
+
+- Improve Alfred-like responses with requests for both butler refs and Batman comic book refs
+  ([`76c422f`](https://github.com/tflagship/pennyworth-slack-bot/commit/76c422f117c2285dcae80196ea5ec654f516fc78))
+
+### Continuous Integration
+
+- Remove dynamic dockerfile creation from workflow
+  ([`66e804c`](https://github.com/tflagship/pennyworth-slack-bot/commit/66e804cab629d2b56db05cfbee4aa22fb5659d4a))
+
+### Documentation
+
+- Add more detail to README
+  ([`a5e977b`](https://github.com/tflagship/pennyworth-slack-bot/commit/a5e977be7c282a400126c2b2e6e487a104cf7d27))
+
+- Update tag ref
+  ([`a90c8bc`](https://github.com/tflagship/pennyworth-slack-bot/commit/a90c8bc5d867147bb6377bfd55d3da2364da8f7f))
+
+### Features
+
+- Add channel conversation context awareness
+  ([`0c576fa`](https://github.com/tflagship/pennyworth-slack-bot/commit/0c576fad1bae7edaea7d070951c96010e53c307e))
+
+- Add current time + timezone awareness method
+  ([`42381bb`](https://github.com/tflagship/pennyworth-slack-bot/commit/42381bb69da1c6810edf978f05b28b7c368ac932))
+
+### Refactoring
+
+- Move AI Assistant functionality to dedicated module
+  ([`9e47ddd`](https://github.com/tflagship/pennyworth-slack-bot/commit/9e47ddd55c0e6ee49005059d2396f5c6eba5e3de))
+
+- Move Trello functionality to dedicated module
+  ([`fbd2b30`](https://github.com/tflagship/pennyworth-slack-bot/commit/fbd2b304c21cd4059afe013507191f1f70e0e26c))
+
+
 ## v1.1.0 (2025-03-07)
 
 ### Chores
