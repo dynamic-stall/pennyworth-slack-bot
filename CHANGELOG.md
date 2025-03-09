@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.4.1 (2025-03-09)
+
+### Bug Fixes
+
+- Add health check functionality
+  ([`7947320`](https://github.com/tflagship/pennyworth-slack-bot/commit/7947320c5d6c36a62c3c12a719ce3b3e48a7fb4a))
+
+
 ## v1.4.0 (2025-03-09)
 
 ### Bug Fixes
