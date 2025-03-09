@@ -742,6 +742,23 @@ class PennyworthBot:
                 user_address = self.get_user_address(user_id)
                 say(f"I'm terribly sorry, {user_address}. I couldn't summarize the conversation at this time.")
 
+        @self.slack_app.message("")
+        def handle_direct_messages(message: Dict[str, Any], say: Callable[[str], None]) -> None:
+            """Handle messages in DMs and private channels"""
+            # Skip messages from bots and messages with subtypes
+            if message.get("subtype") is not None or message.get("bot_id") is not None:
+                return
+                
+            user_id = message.get('user')
+            text = message.get('text', '').strip()
+            channel_type = message.get('channel_type')
+            
+            # Only process DMs
+            if channel_type == "im" and not text.startswith("!"):
+                user_address = self.get_user_address(user_id)
+                response = self.ai_assistant.get_contextual_response(text, user_address)
+                say(response)
+
         @self.slack_app.message(re.compile(r"^!trello\s+(.+)"))
         def handle_trello_workflow(message: Dict[str, Any], say: Callable[[str], None]) -> None:
             user_id = message.get('user', 'unknown')
