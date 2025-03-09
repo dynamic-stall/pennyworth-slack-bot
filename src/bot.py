@@ -52,6 +52,28 @@ class PennyworthBot:
         self._register_handlers()
         logger.info("Pennyworth Bot initialized successfully")
 
+    def update_bot_profile(self):
+        """Update Pennyworth bot's profile settings"""
+        try:
+            bot_user_id = self.slack_app.client.auth_test()["user_id"]
+
+            profile_info = {
+                "display_name": "Pennyworth",
+                "status_text": "At your service",
+                "status_emoji": ":robot_face:",
+                "tz": os.getenv('TIMEZONE', 'America/New_York'),
+                "email": os.getenv('SERVICE_EMAIL')
+            }
+
+            self.slack_app.client.users_profile_set(
+                user=bot_user_id,
+                profile=profile_info)
+            
+            logger.info("Pennyworth bot profile updated successfully")
+
+        except Exception as e:
+            logger.error(f"Error updating Pennyworth bot profile: {e}")
+
     def _get_time_greeting(self):
         """
         Return a greeting based on the time of day.
