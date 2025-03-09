@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v1.4.2 (2025-03-09)
+
+### Bug Fixes
+
+- Add retry logic for API calls
+  ([`676078f`](https://github.com/tflagship/pennyworth-slack-bot/commit/676078ff7b7d276ef31128156786089f9c0f6d8f))
+
+
 ## v1.4.1 (2025-03-09)
 
 ### Bug Fixes
