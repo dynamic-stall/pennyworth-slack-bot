@@ -293,6 +293,74 @@ class PennyworthBot:
             logger.error(f"Error generating task description: {e}")
             return f"Task: {task_title}"
 
+    def get_channel_data(self, channel_id: str) -> Dict[str, Any]:
+        """
+        Fetch comprehensive channel information for AI context
+        
+        Args:
+            channel_id: The Slack channel ID
+            
+        Returns:
+            Dict with channel information including members
+        """
+        try:
+            # Get channel info
+            channel_info = self.slack_app.client.conversations_info(channel=channel_id)["channel"]
+            channel_name = channel_info.get("name", "unknown-channel")
+            
+            # Get channel members
+            member_ids = []
+            cursor = None
+            while True:
+                result = self.slack_app.client.conversations_members(
+                    channel=channel_id,
+                    limit=200,  # Maximum allowed by Slack API
+                    cursor=cursor
+                )
+                member_ids.extend(result["members"])
+                cursor = result.get("response_metadata", {}).get("next_cursor")
+                if not cursor:
+                    break
+                    
+            # Get user info for each member
+            members_formatted = []
+            for member_id in member_ids:
+                try:
+                    user_info = self.slack_app.client.users_info(user=member_id)["user"]
+                    display_name = user_info.get("profile", {}).get("display_name") or user_info.get("real_name") or "Unknown User"
+                    # Don't include bots
+                    if not user_info.get("is_bot", False):
+                        members_formatted.append(f"{display_name} (<@{member_id}>)")
+                except Exception as e:
+                    logger.warning(f"Error fetching user info for {member_id}: {e}")
+                    
+            # Format channel creation timestamp
+            created_ts = int(channel_info.get("created", 0))
+            created = datetime.datetime.fromtimestamp(created_ts).strftime("%Y-%m-%d") if created_ts > 0 else "Unknown"
+            
+            # Return structured channel data
+            return {
+                "id": channel_id,
+                "name": channel_name,
+                "topic": channel_info.get("topic", {}).get("value", "No topic set"),
+                "purpose": channel_info.get("purpose", {}).get("value", "No purpose set"),
+                "created": created,
+                "is_private": channel_info.get("is_private", False),
+                "member_count": len(member_ids),
+                "members": member_ids,
+                "members_formatted": members_formatted
+            }
+            
+        except Exception as e:
+            logger.error(f"Error fetching channel data: {e}")
+            return {
+                "name": "unknown-channel",
+                "topic": "Unable to fetch channel information",
+                "purpose": "Error occurred",
+                "member_count": 0,
+                "members_formatted": []
+            }
+
     def _register_handlers(self):
         # Enhanced greeting
         @self.slack_app.message("hello")
