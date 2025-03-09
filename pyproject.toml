@@ -6,3 +6,6 @@ upload_to_repository = true
 build_command = ""
 commit_version_number = true
 github_token = "$GH_TOKEN"
+changelog_file = "CHANGELOG.md"
+allow_tag_prefix = true
+major_on_zero = false
