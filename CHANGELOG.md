@@ -1,6 +1,38 @@
 # CHANGELOG
 
 
+## v1.4.0 (2025-03-09)
+
+### Bug Fixes
+
+- Add 'handle_direct_messages' handler for improved DM/private channel responsiveness
+  ([`ae86b85`](https://github.com/tflagship/pennyworth-slack-bot/commit/ae86b85b9b61de566935f188c1a344b7aab76039))
+
+- Move 'channel_info_patterns' before standard response
+  ([`850d29c`](https://github.com/tflagship/pennyworth-slack-bot/commit/850d29cf26ae68e41509364b7b569be1cf78ea2c))
+
+### Chores
+
+- Update 'LOG_LEVEL' env. variable with 'LOG_LEVEL' repo variable mapping
+  ([`0e0f4b9`](https://github.com/tflagship/pennyworth-slack-bot/commit/0e0f4b9e28e1dc5d849b8ad2c0d1804b4d8a2a2c))
+
+- Update example variables for logs
+  ([`27a4031`](https://github.com/tflagship/pennyworth-slack-bot/commit/27a4031f25853659edb73a2b6d62c98cc9e27c1b))
+
+- Update logging configuration
+  ([`171be55`](https://github.com/tflagship/pennyworth-slack-bot/commit/171be55c5318c6d5508483101e516ae8b7ee31d5))
+
+### Documentation
+
+- Update OAuth scopes and event sunscriptions:
+  ([`061365b`](https://github.com/tflagship/pennyworth-slack-bot/commit/061365bf2b58f0f15b0ac452f6b7f697af7badd3))
+
+### Features
+
+- Modify 'get_contextual_response' method to include channel data
+  ([`b3ebf84`](https://github.com/tflagship/pennyworth-slack-bot/commit/b3ebf84500bb5b39eca03a8db1378e0031c35fdf))
+
+
 ## v1.3.0 (2025-03-09)
 
 ### Chores
