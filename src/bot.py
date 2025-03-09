@@ -19,7 +19,8 @@ from typing import Optional, Dict, Any, Callable, List
 # Configure logging
 logging.basicConfig(
     level=os.getenv('LOG_LEVEL', 'INFO'),
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
 )
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,8 @@ class PennyworthBot:
             token=os.getenv('SLACK_BOT_TOKEN'),
             signing_secret=os.getenv('SLACK_SIGNING_SECRET')
         )
+
+        self.update_bot_profile()
 
         # Gemini AI model - use environment variable with default fallback
         self.ai_assistant = AIAssistant(os.getenv('GOOGLE_GEMINI_API_KEY'))
@@ -67,7 +70,8 @@ class PennyworthBot:
 
             self.slack_app.client.users_profile_set(
                 user=bot_user_id,
-                profile=profile_info)
+                profile=profile_info
+            )
             
             logger.info("Pennyworth bot profile updated successfully")
 
