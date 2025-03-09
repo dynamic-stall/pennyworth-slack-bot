@@ -512,15 +512,6 @@ class PennyworthBot:
                     except Exception as e:
                         logger.error(f"Error processing thread context: {e}")
                 
-                # Standard response with no special context
-                response = self.ai_assistant.get_contextual_response(message_text, user_address)
-                
-                # If in thread, reply to thread
-                if is_in_thread:
-                    say(text=response, thread_ts=thread_ts)
-                else:
-                    say(response)
-
                 # Detect if query is asking about channel information
                 channel_info_patterns = [
                     r"(?:who|what|list|tell).+(?:members|users|people|participants)",
@@ -545,6 +536,15 @@ class PennyworthBot:
                     else:
                         say(response)
                     return
+
+                # Standard response with no special context
+                response = self.ai_assistant.get_contextual_response(message_text, user_address)
+                
+                # If in thread, reply to thread
+                if is_in_thread:
+                    say(text=response, thread_ts=thread_ts)
+                else:
+                    say(response)
 
             except Exception as e:
                 logger.error(f"Error handling app mention: {str(e)}")
