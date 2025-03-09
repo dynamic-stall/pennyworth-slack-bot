@@ -1,17 +1,32 @@
 name: Semantic Release
 
 on:
-  push:
-    branches:
-      - main
+  workflow_run:
+    workflows: ["Deploy Slack Bot"]
+    branches: [main]
+    types:
+      - completed
 
 jobs:
   release:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
+
+    concurrency:
+      group: semantic-release-${{ github.ref }}
+      cancel-in-progress: false
+    
     steps:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
+          
+      - name: Fetch latest changes
+        run: |
+          git config --global user.name "GitHub Action"
+          git config --global user.email "action@github.com"
+          git fetch
+          git pull --rebase origin main
           
       - name: Python Semantic Release
         uses: python-semantic-release/python-semantic-release@v9.21.0
