@@ -92,26 +92,47 @@ Pennyworth is an elegant Slack assistant that combines AI capabilities, Trello i
     4. Check "Allow users to send messages in the app home"
 
 3. OAuth & Permissions
-    1. Go to "OAuth & Permissions"
-    2. Add these Bot Token Scopes:
-        - `app_mentions:read`
-        - `channels:history`
-        - `channels:read`
-        - `chat:write`
-        - `im:history`
-        - `im:read`
-        - `im:write`
-        - `team:read`
+    1. Go to **"OAuth & Permissions"**
+    2. Add these _Bot Token Scopes:_
+        - `app_mentions:read`       - Detect @mentions of your bot
+        - `channels:history`        - Read messages in public channels
+        - `channels:join`           - Join public channels
+        - `channels:read`           - View public channels
+        - `chat:write`              - Send messages
+        - `chat:write.public`       - Send messages to public channels
+        - `groups:history`          - Read messages in private channels
+        - `groups:read`             - View private channels
+        - `im:history`              - Read direct messages
+        - `im:read`                 - View direct messages
+        - `im:write`                - Send direct messages
+        - `mpim:history`            - Read group direct messages
+        - `mpim:read`               - View group direct messages
+        - `mpim:write`              - Send group direct messages
+        - `reactions:read`          - View reactions
+        - `reactions:write`         - Add/remove reactions
+        - `team:read`               - View basic team info
+        - `users:read`              - View user profiles
+        - `users:read.email`        - View email addresses
+    
+    3. Add these _User Token Scopes:_
+        - `chat:write:user`         - Send messages as user
+        - `users.profile:read`      - View user profiles in detail
 
 4. Event Subscriptions
-    1. Go to "Event Subscriptions" and enable
-    2. Subscribe to these bot events:
-        - `message.channels`
-        - `message.im`
-        - `message.groups`
-        - `app_mention`
-        - `team_join`
-
+    1. Go to **"Event Subscriptions"** and enable
+    2. Subscribe to these _bot events:_
+        - `app_mention`             - When someone @mentions your bot
+        - `message.channels`        - Messages in public channels
+        - `message.groups`          - Messages in private channels
+        - `message.im`              - Direct messages to your bot
+        - `message.mpim`            - Messages in group DMs with your bot
+        - `team_join`               - When new users join the workspace
+        - `channel_created`         - When a channel is created
+        - `channel_archive`         - When a channel is archived
+        - `channel_unarchive`       - When a channel is unarchived
+        - `member_joined_channel`   - When users join a channel
+        - `member_left_channel`     - When users leave a channel
+    
 5. Socket Mode
     1. Go to "Socket Mode" and enable
     2. Create an app-level token with `connections:write` scope
