@@ -1,6 +1,30 @@
 # CHANGELOG
 
 
+## v1.3.0 (2025-03-09)
+
+### Chores
+
+- Correct 'GH_TOKEN' env variable ref
+  ([`8d7bfce`](https://github.com/tflagship/pennyworth-slack-bot/commit/8d7bfce6642dc7932ee1fc8b22a504dca4d8ea57))
+
+- Fix 'github_token' env variable syntax
+  ([`5974f88`](https://github.com/tflagship/pennyworth-slack-bot/commit/5974f88c10682caf85f42a6475ccaebf325aa7f8))
+
+- Update 'semantic-release' cmd auth + workflow
+  ([`bfa1be9`](https://github.com/tflagship/pennyworth-slack-bot/commit/bfa1be993cb01a488660ef7757a5e42c28b06cfa))
+
+### Documentation
+
+- Update sem-ver ref
+  ([`7dbda5d`](https://github.com/tflagship/pennyworth-slack-bot/commit/7dbda5d1bc9f9199c4f8a96a10b2c8ba7a9a60be))
+
+### Features
+
+- Update user profile settings with 'slack_sdk'
+  ([`035e6e0`](https://github.com/tflagship/pennyworth-slack-bot/commit/035e6e0f0eba3b0c4569e1c1ddfdfe0dcf256cd8))
+
+
 ## v1.2.0 (2025-03-08)
 
 ### Bug Fixes
