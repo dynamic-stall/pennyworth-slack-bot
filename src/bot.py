@@ -15,6 +15,10 @@ from dotenv import load_dotenv
 from src.ai_assistant import AIAssistant
 from src.trello_workflows import TrelloWorkflow
 from typing import Optional, Dict, Any, Callable, List
+import threading
+import schedule
+import time
+from datetime import datetime
 
 # Configure logging
 logging.basicConfig(
@@ -844,13 +848,66 @@ class PennyworthBot:
                 error_message = self._get_alfred_style_response(user_id, "error")
                 say(f"{error_message} The Trello system appears to be offline: {str(e)}")
 
+    def start_health_check_scheduler(self):
+        """Start a background thread for periodic health checks"""
+        def run_scheduler():
+            # Run an immediate health check
+            self.perform_health_check()
+            
+            # Schedule to run every 4 hours
+            schedule.every(4).hours.do(self.perform_health_check)
+            
+            while True:
+                schedule.run_pending()
+                time.sleep(3600)  # Check every hour for scheduled tasks
+        
+        thread = threading.Thread(target=run_scheduler, daemon=True)
+        thread.start()
+        logger.info("Health check scheduler started")
+
+    def perform_health_check(self):
+        """Perform health checks on all external services"""
+        logger.info(f"Running health check at {datetime.now().isoformat()}")
+        
+        # Check Slack connection
+        try:
+            result = self.with_retry(lambda: self.slack_app.client.auth_test())
+            logger.info(f"Slack connection OK (authenticated as {result.get('user')})")
+        except Exception as e:
+            logger.error(f"Slack connection check failed: {e}")
+        
+        # Check Trello connection
+        try:
+            boards = self.trello_workflow.get_boards()
+            if boards.get("success"):
+                logger.info(f"Trello connection OK ({len(boards.get('boards', []))} boards accessible)")
+            else:
+                logger.error(f"Trello connection check failed: {boards.get('error')}")
+        except Exception as e:
+            logger.error(f"Trello connection check failed: {e}")
+        
+        # Check AI model connection
+        try:
+            test_prompt = "Respond with 'OK' if this test works"
+            response = self.ai_assistant.get_contextual_response(test_prompt, "Health Check")
+            if response and "OK" in response:
+                logger.info("AI model connection OK")
+            else:
+                logger.warning(f"AI model check returned unexpected response: {response[:50]}...")
+        except Exception as e:
+            logger.error(f"AI model check failed: {e}")
+
     def start(self):
         try:
-            logger.info("Starting Pennyworth Bot in Socket Mode")
-                        
+            logger.info("Starting Pennyworth Bot")
+            
+            self.start_health_check_scheduler()
+            logger.info("Health checks scheduled (every 4 hours)")
+            
             handler = SocketModeHandler(
                 self.slack_app, 
                 os.getenv('SLACK_APP_TOKEN'),
+                ping_interval=30
             )
             handler.start()
         except Exception as e:
