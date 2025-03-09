@@ -393,11 +393,11 @@ class PennyworthBot:
                         total = success_count + failure_count
                         if total > 0:
                             ratio_info = f"""
-        Based on the last {total} deployment messages in this channel:
-        - Successful deployments: {success_count} ({int((success_count/total)*100)}%)  
-        - Failed deployments: {failure_count} ({int((failure_count/total)*100)}%)
-        - Success ratio: {success_count}:{failure_count}
-        """
+            Based on the last {total} deployment messages in this channel:
+            - Successful deployments: {success_count} ({int((success_count/total)*100)}%)  
+            - Failed deployments: {failure_count} ({int((failure_count/total)*100)}%)
+            - Success ratio: {success_count}:{failure_count}
+            """
                                                        
                             # Generate AI response with stats context
                             logger.info(f"Generating deployment statistics response for user {user_id}")
@@ -452,7 +452,32 @@ class PennyworthBot:
                     say(text=response, thread_ts=thread_ts)
                 else:
                     say(response)
-            
+
+                # Detect if query is asking about channel information
+                channel_info_patterns = [
+                    r"(?:who|what|list|tell).+(?:members|users|people|participants)",
+                    r"(?:who).+(?:in|part of).+(?:channel|here|this)",
+                    r"(?:tell|show).+(?:about|info|information).+(?:channel|here)",
+                    r"(?:what).+(?:channel|topic|purpose)"
+                ]
+
+                is_channel_query = any(re.search(pattern, message_text.lower()) for pattern in channel_info_patterns)
+
+                if is_channel_query:
+                    # Fetch channel data and use the enhanced contextual response
+                    channel_data = self.get_channel_data(channel)
+                    response = self.ai_assistant.get_contextual_response(
+                        query=message_text,
+                        user_address=user_address,
+                        channel_data=channel_data
+                    )
+                    
+                    if is_in_thread:
+                        say(text=response, thread_ts=thread_ts)
+                    else:
+                        say(response)
+                    return
+
             except Exception as e:
                 logger.error(f"Error handling app mention: {str(e)}")
                 say(f"I do apologize, but I'm experiencing some technical difficulties. Error details: {str(e)}")
@@ -573,11 +598,11 @@ class PennyworthBot:
                         total = success_count + failure_count
                         if total > 0:
                             ratio_info = f"""
-        Based on the last {total} deployment messages in this channel:
-        - Successful deployments: {success_count} ({int((success_count/total)*100)}%)  
-        - Failed deployments: {failure_count} ({int((failure_count/total)*100)}%)
-        - Success ratio: {success_count}:{failure_count}
-        """
+            Based on the last {total} deployment messages in this channel:
+            - Successful deployments: {success_count} ({int((success_count/total)*100)}%)  
+            - Failed deployments: {failure_count} ({int((failure_count/total)*100)}%)
+            - Success ratio: {success_count}:{failure_count}
+            """
                             
                             # Use AI assistant with workflow stats
                             user_address = self.get_user_address(user_id)
@@ -623,14 +648,14 @@ class PennyworthBot:
                     
                 # Create summarization prompt
                 summary_prompt = f"""
-Please summarize the following conversation in the style of Alfred Pennyworth from the Batman Arkham games:
-formal, dignified, and slightly sardonic.
+            Please summarize the following conversation in the style of Alfred Pennyworth from the Batman Arkham games:
+            formal, dignified, and slightly sardonic.
 
-Keep the summary concise (no more than 150 words) but comprehensive, capturing the main topics and any important decisions or action items.
+            Keep the summary concise (no more than 150 words) but comprehensive, capturing the main topics and any important decisions or action items.
 
-CONVERSATION:
-{" ".join(messages[:20])}
-"""
+            CONVERSATION:
+            {" ".join(messages[:20])}
+            """
 
                 context = {
                     'channel_name': channel_name,

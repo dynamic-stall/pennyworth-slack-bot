@@ -38,14 +38,14 @@ class AIAssistant:
             
             # Personality instructions for Alfred Pennyworth
             alfred_instruction = f"""
-            Respond as Alfred Pennyworth from the Batman Arkham video game series. 
-            Use a formal, dignified, and slightly sardonic tone.
-            Address the user as "{user_address}".
-            Be helpful, wise, and occasionally witty, but always respectful.
-            Include subtle references to being a butler, as well as Batman comic book references, when appropriate.
-            IMPORTANT: Keep responses CONCISE and to the point (100 words maximum).
-            Focus on answering the question directly first, then add brief characterization.
-            """            
+        Respond as Alfred Pennyworth from the Batman Arkham video game series. 
+        Use a formal, dignified, and slightly sardonic tone.
+        Address the user as "{user_address}".
+        Be helpful, wise, and occasionally witty, but always respectful.
+        Include subtle references to being a butler, as well as Batman comic book references, when appropriate.
+        IMPORTANT: Keep responses CONCISE and to the point (100 words maximum).
+        Focus on answering the question directly first, then add brief characterization.
+        """            
             # Add context to the prompt if provided
             if context:
                 channel = context.get("channel", "general channel")
@@ -133,7 +133,8 @@ class AIAssistant:
 
     def get_contextual_response(self, query: str, user_address: str, 
                             thread_context: Optional[List[str]] = None, 
-                            workflow_stats: Optional[Dict[str, Any]] = None) -> str:
+                            workflow_stats: Optional[Dict[str, Any]] = None,
+                            channel_data: Optional[Dict[str, Any]] = None) -> str:
         """
         Generate a response with additional context awareness
         
@@ -142,6 +143,7 @@ class AIAssistant:
             user_address (str): How to address the user
             thread_context (List[str], optional): Messages from a thread
             workflow_stats (Dict, optional): Statistics about workflows/deployments
+            channel_data (Dict, optional): Channel information including members, topic, etc.
             
         Returns:
             str: AI-generated response
@@ -149,41 +151,57 @@ class AIAssistant:
         try:
             # Base Alfred prompt with brevity instruction
             alfred_prompt = f"""
-    You are Alfred Pennyworth from the Batman Arkham video game series.
-    Use a formal, dignified, and slightly sardonic tone.
-    Address the user as "{user_address}".
-    Be helpful, wise, and occasionally witty, but always respectful.
-    Include subtle references to being a butler when appropriate.
+        You are Alfred Pennyworth from the Batman Arkham video game series.
+        Use a formal, dignified, and slightly sardonic tone.
+        Address the user as "{user_address}".
+        Be helpful, wise, and occasionally witty, but always respectful.
+        Include subtle references to being a butler when appropriate.
 
-    IMPORTANT: Keep responses CONCISE (50-100 words maximum).
-    Focus on answering the question directly first, then add brief characterization.
-    """
+        IMPORTANT: Keep responses CONCISE (50-100 words maximum).
+        Focus on answering the question directly first, then add brief characterization.
+        """
+
+            # Add channel data if provided
+            if channel_data:
+                members_str = ", ".join(channel_data.get("members_formatted", ["No members found"]))
+                alfred_prompt += f"""
+        CHANNEL CONTEXT:
+        You are in the #{channel_data['name']} channel.
+        Channel topic: {channel_data.get('topic', 'No topic set')}
+        Channel purpose: {channel_data.get('purpose', 'No purpose set')}
+        Channel created: {channel_data.get('created', 'Unknown date')}
+        Channel members ({channel_data.get('member_count', 0)}): {members_str}
+
+        When referencing users, use their proper names from the member list.
+        If asked about members, topic, purpose, etc., provide accurate information from the context.
+        """
 
             # Add thread context if provided
-            if thread_context and len(thread_context) > 0:
+            elif thread_context and len(thread_context) > 0:
                 alfred_prompt += f"""
-    You're replying in a thread conversation. Here's the recent conversation:
-    {chr(10).join(thread_context[-8:])}
+        You're replying in a thread conversation. Here's the recent conversation:
+        {chr(10).join(thread_context[-8:])}
 
-    The user specifically asked: "{query}"
+        The user specifically asked: "{query}"
 
-    If you're being asked about information in the thread, reference it directly.
-    Always respond politely, as if joining an ongoing conversation.
-    """
+        If you're being asked about information in the thread, reference it directly.
+        Always respond politely, as if joining an ongoing conversation.
+        """
             # Add workflow statistics if provided
             elif workflow_stats:
                 alfred_prompt += f"""
-    The user asked about workflows or deployments. Here are the actual statistics:
-    {workflow_stats['ratio_info']}
+        The user asked about workflows or deployments. Here are the actual statistics:
+        {workflow_stats['ratio_info']}
 
-    User query: {query}
+        User query: {query}
 
-    Respond with the accurate statistics, formatted neatly. Don't make up numbers.
-    """
-            else:
-                alfred_prompt += f"""
-    User query: {query}
-    """
+        Respond with the accurate statistics, formatted neatly. Don't make up numbers.
+        """
+            
+            # Always add the query at the end
+            alfred_prompt += f"""
+        User query: {query}
+        """
             
             # Generate response
             response = self.model.generate_content(alfred_prompt)
@@ -206,11 +224,11 @@ class AIAssistant:
             str: AI-generated response about the time
         """
         prompt = f"""
-    You are Alfred Pennyworth from Batman.
-    The time in {location} is currently {time_str}.
-    Create a very brief, butler-like response telling {user_address} the time.
-    Keep it under 25 words, formal but slightly witty.
-    """
+        You are Alfred Pennyworth from Batman.
+        The time in {location} is currently {time_str}.
+        Create a very brief, butler-like response telling {user_address} the time.
+        Keep it under 25 words, formal but slightly witty.
+        """
         try:
             response = self.model.generate_content(prompt)
             return response.text.strip()
