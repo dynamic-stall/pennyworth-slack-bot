@@ -5,4 +5,4 @@ upload_to_pypi = false
 upload_to_repository = true
 build_command = ""
 commit_version_number = true
-github_token = $GH_TOKEN
+github_token = GH_TOKEN
