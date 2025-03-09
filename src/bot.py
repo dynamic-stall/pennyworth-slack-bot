@@ -14,11 +14,12 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 from src.ai_assistant import AIAssistant
 from src.trello_workflows import TrelloWorkflow
+from datetime import datetime
 from typing import Optional, Dict, Any, Callable, List
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 import threading
 import schedule
 import time
-from datetime import datetime
 
 # Configure logging
 logging.basicConfig(
@@ -81,6 +82,28 @@ class PennyworthBot:
 
         except Exception as e:
             logger.error(f"Error updating Pennyworth bot profile: {e}")
+
+    def with_retry(self, func, max_attempts=3):
+        """
+        Apply retry logic to a function that makes API calls
+        
+        Args:
+            func: Function to retry
+            max_attempts: Maximum number of retry attempts
+            
+        Returns:
+            Function result after successful execution
+        """
+        @retry(
+            stop=stop_after_attempt(max_attempts),
+            wait=wait_exponential(multiplier=1, min=2, max=10),
+            retry=retry_if_exception_type((ConnectionError, TimeoutError, Exception)),
+            reraise=True
+        )
+        def wrapper():
+            return func()
+        
+        return wrapper()
 
     def _get_time_greeting(self):
         """
@@ -309,17 +332,22 @@ class PennyworthBot:
         """
         try:
             # Get channel info
-            channel_info = self.slack_app.client.conversations_info(channel=channel_id)["channel"]
+            channel_info = self.with_retry(
+                lambda: self.slack_app.client.conversations_info(channel=channel_id)
+            )["channel"]
+
             channel_name = channel_info.get("name", "unknown-channel")
             
             # Get channel members
             member_ids = []
             cursor = None
             while True:
-                result = self.slack_app.client.conversations_members(
-                    channel=channel_id,
-                    limit=200,  # Maximum allowed by Slack API
-                    cursor=cursor
+                result = self.with_retry(
+                    lambda: self.slack_app.client.conversations_members(
+                        channel=channel_id,
+                        limit=200,  # Maximum allowed by Slack API
+                        cursor=cursor
+                    )
                 )
                 member_ids.extend(result["members"])
                 cursor = result.get("response_metadata", {}).get("next_cursor")
@@ -330,11 +358,16 @@ class PennyworthBot:
             members_formatted = []
             for member_id in member_ids:
                 try:
-                    user_info = self.slack_app.client.users_info(user=member_id)["user"]
+                    user_info = self.with_retry(
+                        lambda: self.slack_app.client.users_info(user=member_id)
+                    )["user"]
+
                     display_name = user_info.get("profile", {}).get("display_name") or user_info.get("real_name") or "Unknown User"
+
                     # Don't include bots
                     if not user_info.get("is_bot", False):
                         members_formatted.append(f"{display_name} (<@{member_id}>)")
+
                 except Exception as e:
                     logger.warning(f"Error fetching user info for {member_id}: {e}")
                     
@@ -442,10 +475,11 @@ class PennyworthBot:
                 # Check for workflow/deployment statistics
                 if "workflow" in message_text.lower() or "deployment" in message_text.lower() or "ratio" in message_text.lower() or "success" in message_text.lower():
                     try:
-                        # Get channel history
-                        history = self.slack_app.client.conversations_history(
-                            channel=channel,
-                            limit=50  # Last 50 messages
+                        history = self.with_retry(
+                            lambda: self.slack_app.client.conversations_history(
+                                channel=channel,
+                                limit=50
+                            )
                         )
                         
                         # Extract deployment status messages
@@ -483,7 +517,7 @@ class PennyworthBot:
                                 say(response)
                             return
                     except Exception as e:
-                        logger.error(f"Error processing deployment statistics: {e}")
+                        logger.error(f"Failed to get conversation history even with retries: {e}")
                 
                 # Thread awareness - get thread context if in a thread
                 if is_in_thread:
@@ -647,10 +681,12 @@ class PennyworthBot:
                 if "workflow" in query.lower() or "deployment" in query.lower() or "ratio" in query.lower() or "success" in query.lower():
                     try:
                         channel_id = message.get('channel')
-                        # Get channel history
-                        history = self.slack_app.client.conversations_history(
-                            channel=channel_id,
-                            limit=50  # Last 50 messages
+
+                        history = self.with_retry(
+                            lambda: self.slack_app.client.conversations_history(
+                                channel=channel_id,
+                                limit=50
+                            )
                         )
                         
                         # Extract deployment status messages
@@ -684,7 +720,7 @@ class PennyworthBot:
                             say(response)
                             return
                     except Exception as e:
-                        logger.error(f"Error processing deployment statistics: {e}")
+                        logger.error(f"Error processing deployment statistics even with retries: {e}")
 
                 # Standard response
                 user_address = self.get_user_address(user_id)
@@ -704,13 +740,15 @@ class PennyworthBot:
                 user_id = message.get('user')
                 user_address = self.get_user_address(user_id)
                 
-                # Get channel info
                 channel_info = self.slack_app.client.conversations_info(channel=channel_id)
                 channel_name = channel_info['channel']['name'] if 'name' in channel_info['channel'] else "this conversation"
                 
-                # Fetch conversation history
-                history = self.slack_app.client.conversations_history(channel=channel_id, limit=30)
-                
+                history = self.with_retry(
+                    lambda: self.slack_app.client.conversations_history(
+                        channel=channel_id,
+                        limit=50
+                    )
+                )                
                 # Skip the command message itself
                 messages = [msg['text'] for msg in history['messages'] if 'text' in msg and '!summarize' not in msg['text']][::-1]
                 
@@ -741,7 +779,7 @@ class PennyworthBot:
                 say(f"*Summary of recent conversation in #{channel_name}*\n\n{summary}")
             
             except Exception as e:
-                logger.error(f"Error summarizing conversation: {e}")
+                logger.error(f"Failed to summarize conversation history even with retries: {e}")
                 user_id = message.get('user')
                 user_address = self.get_user_address(user_id)
                 say(f"I'm terribly sorry, {user_address}. I couldn't summarize the conversation at this time.")
