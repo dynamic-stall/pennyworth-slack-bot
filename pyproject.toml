@@ -9,3 +9,5 @@ github_token = "$GH_TOKEN"
 changelog_file = "CHANGELOG.md"
 allow_tag_prefix = true
 major_on_zero = false
+tag_format = "v{version}"
+version_source = "tag"

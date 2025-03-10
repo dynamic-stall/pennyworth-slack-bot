@@ -1,11 +1,11 @@
-name: Semantic Release
+name: Semantic Release (Deploy Slack Bot)
 
 on:
   workflow_run:
     workflows: ["Deploy Slack Bot"]
     branches: [main]
     types:
-      - completed
+        - completed
 
 jobs:
   release:
@@ -17,18 +17,35 @@ jobs:
       cancel-in-progress: false
     
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
         with:
-          fetch-depth: 0
+            fetch-depth: 0
           
       - name: Fetch latest changes
         run: |
-          git config --global user.name "GitHub Action"
-          git config --global user.email "action@github.com"
-          git fetch
-          git pull --rebase origin main
+            git config --global user.name "GitHub Action"
+            git config --global user.email "action@github.com"
+            git fetch
+            git pull --rebase origin main
           
       - name: Python Semantic Release
         uses: python-semantic-release/python-semantic-release@v9.21.0
+        id: semantic-release
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+            github_token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Retry Semantic Release if Failed
+        if: failure()
+        run: |
+            for i in {1..3}; do
+              echo "Retry attempt $i..."
+              python -m semantic_release version
+              if [ $? -eq 0 ]; then
+                echo "Retry succeeded!"
+                exit 0
+              fi
+              sleep 6
+            done
+            echo "All retries failed"
+            exit 1
