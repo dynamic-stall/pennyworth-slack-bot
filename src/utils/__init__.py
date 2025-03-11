@@ -70,3 +70,23 @@ def sanitize_input(text: str) -> str:
     # Remove potential code injection characters
     sanitized = re.sub(r'[`\'";]', '', text)
     return sanitized
+
+def format_error_response(error_message: str) -> Dict[str, Any]:
+    """Format a standardized error response for users"""
+    return format_slack_message(f"Error: {error_message}")
+
+def create_section_block(text: str) -> Dict[str, Any]:
+    """Create a simple section block with text"""
+    return {
+        "type": "section",
+        "text": {
+            "type": "mrkdwn",
+            "text": text
+        }
+    }
+
+def create_thread_reply(message: str, thread_ts: str) -> Dict[str, Any]:
+    """Create a message that replies in a thread"""
+    response = format_slack_message(message)
+    response['thread_ts'] = thread_ts
+    return response
