@@ -7,17 +7,14 @@ import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from dotenv import load_dotenv
 
-# Import the PennyworthBot class
 from src.bot import PennyworthBot
 
-# Configure logging
 logging.basicConfig(
     level=os.getenv('LOG_LEVEL', 'INFO'),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-# Load environment variables
 load_dotenv()
 
 class HealthCheckHandler(BaseHTTPRequestHandler):
