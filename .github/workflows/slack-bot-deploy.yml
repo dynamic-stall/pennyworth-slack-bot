@@ -24,10 +24,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Capture start time
-        id: start-time
-        run: echo "start_time=$(date +%s)" >> $GITHUB_OUTPUT
-
       - name: Extract app version from code
         id: extract_version
         run: |
@@ -35,26 +31,39 @@ jobs:
                 open('src/__init__.py').read()).group(1) or re.search(r\"__version__ = '(.*?)'|version = '(.*?)'\", \
                 open('src/__init__.py').read()).group(2))")" >> $GITHUB_OUTPUT
 
-      - name: Get Secrets from Bitwarden
-        id: bws
-        uses: bitwarden/sm-action@v2
-        with:
-            access_token: ${{ secrets.BW_ACCESS_TOKEN }}
-            base_url: https://vault.bitwarden.com
-            secrets: |
-                c9b70456-681a-4ce3-be4f-b289016dd68c > SLACK_OAUTH_TOKEN
-                b6282a0a-c5e7-4e5b-95c7-b2970171667c > SLACK_APP_TOKEN
-                32a18ec3-e9c6-4de1-9112-b297017087f0 > SLACK_SIGNING_SECRET
-                9e95df6c-4036-418e-98ae-b2890174cfb5 > SLACK_CHANNEL_ID_UPPERYARD
-                32849099-d59f-4352-8343-b298013b178e > SLACK_CHANNEL_ID_GALLEY
-                39bb8999-cc17-4175-b523-b298017519b4 > SLACK_CHANNEL_ID_AFROTAKU
-                0df2aa39-b67e-4a92-b68c-b29801732b31 > SLACK_CHANNEL_ID_UXOPS
-                1f995ad3-5630-4a07-8d6b-b2550186c343 > GEMINI_API_KEY
-                1057ab45-80e4-498b-a18c-b297017e15ee > TRELLO_API_KEY
-                0e194f90-5817-4a54-ac8c-b297017e3cef > TRELLO_API_SECRET
-                c75d328d-8699-4fb3-bb5e-b2980000422f > TRELLO_TOKEN
-                e09a916c-4569-4b99-96c3-b2980006da29 > GCP_PROJECT_ID
-                bf5c0050-1ea5-4e3c-bb04-b2980009024a > GCP_SA_KEY        
+      - name: Create .env file from Bitwarden secrets
+        run: |
+          # Create .env file with all available secrets
+          cat > .env <<EOL
+          # Slack Configuration
+          SLACK_BOT_TOKEN=${{ secrets.SLACK_OAUTH_TOKEN }}
+          SLACK_APP_TOKEN=${{ secrets.SLACK_APP_TOKEN }}
+          SLACK_SIGNING_SECRET=${{ secrets.SLACK_SIGNING_SECRET }}
+          
+          # Channel IDs
+          UPPERYARD_CHANNEL=${{ secrets.SLACK_CHANNEL_ID_UPPERYARD }}
+          GALLEY_CHANNEL=${{ secrets.SLACK_CHANNEL_ID_GALLEY }}
+          AFROTAKU_CHANNEL=${{ secrets.SLACK_CHANNEL_ID_AFROTAKU }}
+          UXOPS_CHANNEL=${{ secrets.SLACK_CHANNEL_ID_UXOPS }}
+          
+          # Trello Configuration
+          TRELLO_API_KEY=${{ secrets.TRELLO_API_KEY }}
+          TRELLO_API_SECRET=${{ secrets.TRELLO_API_SECRET }}
+          TRELLO_TOKEN=${{ secrets.TRELLO_TOKEN }}
+          
+          # Google AI Configuration
+          GOOGLE_GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL=${{ vars.GEMINI_MODEL }}
+          
+          # GCP Configuration
+          GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }}
+          
+          # Application Configuration
+          TIMEZONE=${{ vars.TIMEZONE }}
+          LOG_LEVEL=${{ vars.LOG_LEVEL }}
+          SERVICE_EMAIL=${{ vars.SVC_ACCT_EMAIL }}
+          ADMIN_CHANNEL=${{ secrets.SLACK_CHANNEL_ID_UPPERYARD }}
+          EOL       
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -72,24 +81,24 @@ jobs:
             # Create config file with secrets
             cat > .env <<EOL
             # Slack Configuration
-            SLACK_BOT_TOKEN=${{ steps.bws.outputs.SLACK_OAUTH_TOKEN }}
-            SLACK_APP_TOKEN=${{ steps.bws.outputs.SLACK_APP_TOKEN }}
-            SLACK_SIGNING_SECRET=${{ steps.bws.outputs.SLACK_SIGNING_SECRET }}
-            GALLEY_CHANNEL=${{ steps.bws.outputs.SLACK_CHANNEL_ID_GALLEY }}
-            AFROTAKU_CHANNEL=${{ steps.bws.outputs.SLACK_CHANNEL_ID_AFROTAKU }}
-            UXOPS_CHANNEL=${{ steps.bws.outputs.SLACK_CHANNEL_ID_UXOPS }}
+            SLACK_BOT_TOKEN=${{ secrets.SLACK_OAUTH_TOKEN }}
+            SLACK_APP_TOKEN=${{ secrets.SLACK_APP_TOKEN }}
+            SLACK_SIGNING_SECRET=${{ secrets.SLACK_SIGNING_SECRET }}
+            GALLEY_CHANNEL=${{ secrets.SLACK_CHANNEL_ID_GALLEY }}
+            AFROTAKU_CHANNEL=${{ secrets.SLACK_CHANNEL_ID_AFROTAKU }}
+            UXOPS_CHANNEL=${{ secrets.SLACK_CHANNEL_ID_UXOPS }}
             
             # Chat Settings
             TIMEZONE=${{ vars.TIMEZONE }}
 
             # Google Gemini Configuration
-            GOOGLE_GEMINI_API_KEY=${{ steps.bws.outputs.GEMINI_API_KEY }}
+            GOOGLE_GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
             GEMINI_MODEL=${{ vars.GEMINI_MODEL }}
             
             # Trello Configuration
-            TRELLO_API_KEY=${{ steps.bws.outputs.TRELLO_API_KEY }}
-            TRELLO_API_SECRET=${{ steps.bws.outputs.TRELLO_API_SECRET }}
-            TRELLO_TOKEN=${{ steps.bws.outputs.TRELLO_TOKEN }}
+            TRELLO_API_KEY=${{ secrets.TRELLO_API_KEY }}
+            TRELLO_API_SECRET=${{ secrets.TRELLO_API_SECRET }}
+            TRELLO_TOKEN=${{ secrets.TRELLO_TOKEN }}
 
             # Email Configuration
             SERVICE_EMAIL=${{ vars.SVC_ACCT_EMAIL }}
@@ -102,13 +111,13 @@ jobs:
       - name: Setup gcloud CLI
         uses: google-github-actions/setup-gcloud@v1
         with:
-            project_id: ${{ steps.bws.outputs.GCP_PROJECT_ID }}
+            project_id: ${{ secrets.GCP_PROJECT_ID }}
       
       - name: Authenticate to Google Cloud
         id: auth
         run: |
-            echo '${{ steps.bws.outputs.GCP_SA_KEY }}' > /tmp/gcp-key.json
-            gcloud auth activate-service-account --key-file=/tmp/gcp-key.json --project=${{ steps.bws.outputs.GCP_PROJECT_ID }}
+            echo '${{ secrets.GCP_SA_KEY }}' > /tmp/gcp-key.json
+            gcloud auth activate-service-account --key-file=/tmp/gcp-key.json --project=${{ secrets.GCP_PROJECT_ID }}
             rm /tmp/gcp-key.json
 
       - name: Login to GitHub Container Registry
@@ -145,18 +154,18 @@ jobs:
 
           # Tag it for Google Container Registry
           docker tag ghcr.io/${{ github.repository_owner }}/pennyworth-bot:latest \
-            gcr.io/${{ steps.bws.outputs.GCP_PROJECT_ID }}/pennyworth-bot:latest
+            gcr.io/${{ secrets.GCP_PROJECT_ID }}/pennyworth-bot:latest
           docker tag ghcr.io/${{ github.repository_owner }}/pennyworth-bot:latest \
-            gcr.io/${{ steps.bws.outputs.GCP_PROJECT_ID }}/pennyworth-bot:v${VERSION}
+            gcr.io/${{ secrets.GCP_PROJECT_ID }}/pennyworth-bot:v${VERSION}
 
           # Push tags to GCR
-          docker push gcr.io/${{ steps.bws.outputs.GCP_PROJECT_ID }}/pennyworth-bot:latest
-          docker push gcr.io/${{ steps.bws.outputs.GCP_PROJECT_ID }}/pennyworth-bot:v${VERSION}
+          docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/pennyworth-bot:latest
+          docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/pennyworth-bot:v${VERSION}
 
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy pennyworth-bot \
-            --image gcr.io/${{ steps.bws.outputs.GCP_PROJECT_ID }}/pennyworth-bot:v${VERSION} \
+            --image gcr.io/${{ secrets.GCP_PROJECT_ID }}/pennyworth-bot:v${VERSION} \
             --platform managed \
             --region us-central1 \
             --memory 256Mi \
@@ -164,98 +173,21 @@ jobs:
             --min-instances 0 \
             --max-instances 1 \
             --no-allow-unauthenticated \
-            --set-env-vars "SLACK_BOT_TOKEN=${{ steps.bws.outputs.SLACK_OAUTH_TOKEN }}" \
-            --set-env-vars "SLACK_APP_TOKEN=${{ steps.bws.outputs.SLACK_APP_TOKEN }}" \
-            --set-env-vars "SLACK_SIGNING_SECRET=${{ steps.bws.outputs.SLACK_SIGNING_SECRET }}" \
-            --set-env-vars "GALLEY_CHANNEL"="${{ steps.bws.outputs.SLACK_CHANNEL_ID_GALLEY }}" \
-            --set-env-vars "AFROTAKU_CHANNEL"="${{ steps.bws.outputs.SLACK_CHANNEL_ID_AFROTAKU }}" \
-            --set-env-vars "UXOPS_CHANNEL"="${{ steps.bws.outputs.SLACK_CHANNEL_ID_UXOPS }}" \
+            --set-env-vars "SLACK_BOT_TOKEN=${{ secrets.SLACK_OAUTH_TOKEN }}" \
+            --set-env-vars "SLACK_APP_TOKEN=${{ secrets.SLACK_APP_TOKEN }}" \
+            --set-env-vars "SLACK_SIGNING_SECRET=${{ secrets.SLACK_SIGNING_SECRET }}" \
+            --set-env-vars "GALLEY_CHANNEL"="${{ secrets.SLACK_CHANNEL_ID_GALLEY }}" \
+            --set-env-vars "AFROTAKU_CHANNEL"="${{ secrets.SLACK_CHANNEL_ID_AFROTAKU }}" \
+            --set-env-vars "UXOPS_CHANNEL"="${{ secrets.SLACK_CHANNEL_ID_UXOPS }}" \
             --set-env-vars "TIMEZONE=${{ vars.TIMEZONE }}" \
-            --set-env-vars "GOOGLE_GEMINI_API_KEY=${{ steps.bws.outputs.GEMINI_API_KEY }}" \
+            --set-env-vars "GOOGLE_GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" \
             --set-env-vars "GEMINI_MODEL=${{ vars.GEMINI_MODEL }}" \
-            --set-env-vars "TRELLO_API_KEY=${{ steps.bws.outputs.TRELLO_API_KEY }}" \
-            --set-env-vars "TRELLO_API_SECRET=${{ steps.bws.outputs.TRELLO_API_SECRET }}" \
-            --set-env-vars "TRELLO_TOKEN=${{ steps.bws.outputs.TRELLO_TOKEN }}" \
+            --set-env-vars "TRELLO_API_KEY=${{ secrets.TRELLO_API_KEY }}" \
+            --set-env-vars "TRELLO_API_SECRET=${{ secrets.TRELLO_API_SECRET }}" \
+            --set-env-vars "TRELLO_TOKEN=${{ secrets.TRELLO_TOKEN }}" \
             --set-env-vars "SERVICE_EMAIL=${{ vars.SVC_ACCT_EMAIL }}" \
             --set-env-vars "LOG_LEVEL=${{ vars.LOG_LEVEL }}" \
-            --set-env-vars "ADMIN_CHANNEL=${{ steps.bws.outputs.SLACK_CHANNEL_ID_UPPERYARD }}" \
+            --set-env-vars "ADMIN_CHANNEL=${{ secrets.SLACK_CHANNEL_ID_UPPERYARD }}" \
             --timeout 300s \
-            --project ${{ steps.bws.outputs.GCP_PROJECT_ID }} \
+            --project ${{ secrets.GCP_PROJECT_ID }} \
             --quiet
-              
-      - name: Capture end time
-        id: end-time
-        if: always()
-        run: echo "end_time=$(date +%s)" >> $GITHUB_OUTPUT
-    
-      - name: Calculate runtime
-        id: runtime
-        if: always()
-        run: |
-            start_time=${{ steps.start-time.outputs.start_time }}
-            end_time=${{ steps.end-time.outputs.end_time }}
-            runtime=$((end_time - start_time))
-            minutes=$((runtime / 60))
-            seconds=$((runtime % 60))
-            echo "runtime=${minutes}m ${seconds}s" >> $GITHUB_OUTPUT
-
-      - name: Get current time
-        id: current-time
-        if: always()
-        run: echo "time=$(TZ=America/New_York date '+%Y-%m-%d %H:%M:%S %Z')" >> $GITHUB_OUTPUT
-
-      - name: Send completion notification
-        if: always()
-        uses: slackapi/slack-github-action@v1.25.0
-        env:
-            SLACK_BOT_TOKEN: ${{ steps.bws.outputs.SLACK_OAUTH_TOKEN }}
-        with:
-            channel-id: ${{ steps.bws.outputs.SLACK_CHANNEL_ID_UPPERYARD }}
-            payload: |
-                {
-                "text": "Workflow ${{ job.status }}: Pennyworth AI Slack Bot Application",
-                "blocks": [
-                    {
-                    "type": "header",
-                    "text": {
-                        "type": "plain_text",
-                        "text": "${{ job.status == 'success' && '✅' || '❌' }} Pennyworth Slack Bot: ${{ job.status }}",
-                        "emoji": true
-                    }
-                    },
-                    {
-                    "type": "section",
-                    "fields": [
-                        {
-                        "type": "mrkdwn",
-                        "text": "*Repository:*\n${{ github.repository }}"
-                        },
-                        {
-                        "type": "mrkdwn",
-                        "text": "*Status:*\n${{ job.status }}"
-                        }
-                    ]
-                    },
-                    {
-                    "type": "section",
-                    "fields": [
-                        {
-                        "type": "mrkdwn",
-                        "text": "*Trigger:*\n${{ github.event_name }}"
-                        },
-                        {
-                        "type": "mrkdwn",
-                        "text": "*Workflow:* ${{ github.workflow }}\n*Completed:* ${{ steps.current-time.outputs.time }}\n*Runtime:* ${{ steps.runtime.outputs.runtime }}"
-                        }
-                    ]
-                    },
-                    {
-                    "type": "section",
-                    "text": {
-                        "type": "mrkdwn",
-                        "text": "*<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>*"
-                    }
-                    }
-                ],
-                "color": "${{ job.status == 'success' && '#36a64f' || '#dc3545' }}"
-                }
