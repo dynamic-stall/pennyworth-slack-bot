@@ -6,6 +6,10 @@ Pennyworth is an elegant Slack assistant that combines AI capabilities, Trello i
 
 <br>
 
+![pennyworth-slackbot-scrnshot](https://github.com/user-attachments/assets/72ca12c0-f412-42c1-bff6-a07940218cca)
+
+<br>
+
 ## Features
 
 **AI-Powered Assistance**
