@@ -3,7 +3,7 @@ name: Semantic Release (Deploy Slack Bot)
 on:
   workflow_run:
     workflows: ["Deploy Slack Bot"]
-    branches: [main]
+    branches: [folio]
     types:
         - completed
 
