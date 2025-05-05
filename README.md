@@ -211,7 +211,7 @@ pennyworth-slack-bot/
 │
 ├── .env.example             # Example environment variables
 ├── Dockerfile               # Container definition
-├── requirements.txt         # Project dependencies
+├── environment.yml          # Project dependencies
 ├── pyproject.toml           # Semantic versioning config
 ├── CHANGELOG.md             # Automatically generated changelog
 └── README.md                # Project documentation
